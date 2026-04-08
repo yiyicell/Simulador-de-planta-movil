@@ -16,8 +16,8 @@ import re
 import sqlite3
 import bcrypt
 
-from backend.database import get_connection, init_db
-from backend.auth.models import UsuarioRegistro, UsuarioRespuesta
+from database import get_connection, init_db
+from auth.models import UsuarioRegistro, UsuarioRespuesta
 
 
 # ---------------------------------------------------------------------------
@@ -74,8 +74,8 @@ def registrar_usuario(datos: UsuarioRegistro) -> dict:
           - "usuario" (UsuarioRespuesta | None)
 
     Ejemplo de uso:
-        from backend.auth.register import registrar_usuario
-        from backend.auth.models import UsuarioRegistro
+        from auth.register import registrar_usuario
+        from auth.models import UsuarioRegistro
 
         datos = UsuarioRegistro(nombre="Ana", correo="ana@mail.com", password="segura123")
         resultado = registrar_usuario(datos)
