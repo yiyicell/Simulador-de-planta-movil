@@ -17,50 +17,105 @@ export default function IndexScreen() {
   const [confirmarContrasena, setConfirmarContrasena] = useState('')
   const [mensajeError, setMensajeError] = useState('')
 
-  const manejarRegistro = () => {
-    const correoLimpio = correo.trim().toLowerCase()
-    const confirmarCorreoLimpio = confirmarCorreo.trim().toLowerCase()
-    const nombreLimpio = nombre.trim()
+  const manejarRegistro = async () => {
+  const correoLimpio = correo.trim().toLowerCase()
+  const confirmarCorreoLimpio = confirmarCorreo.trim().toLowerCase()
+  const nombreLimpio = nombre.trim()
 
-    const formatoCorreo = /\S+@\S+\.\S+/
+  const formatoCorreo = /\S+@\S+\.\S+/
 
-    if (
-      nombreLimpio === '' ||
-      correo.trim() === '' ||
-      confirmarCorreo.trim() === '' ||
-      contrasena.trim() === '' ||
-      confirmarContrasena.trim() === ''
-    ) {
-      setMensajeError('Por favor completa todos los campos')
-      return
-    }
-
-    if (
-      !formatoCorreo.test(correoLimpio) ||
-      !formatoCorreo.test(confirmarCorreoLimpio)
-    ) {
-      setMensajeError('Ingresa un correo válido')
-      return
-    }
-
-    if (contrasena.length < 8 || confirmarContrasena.length < 8) {
-      setMensajeError('La contraseña debe tener mínimo 8 caracteres')
-      return
-    }
-
-    if (correoLimpio !== confirmarCorreoLimpio) {
-      setMensajeError('Los correos no coinciden')
-      return
-    }
-
-    if (contrasena !== confirmarContrasena) {
-      setMensajeError('Las contraseñas no coinciden')
-      return
-    }
-
-    setMensajeError('')
-    Alert.alert('Registro válido', 'Todos los datos están correctos')
+  if (
+    nombreLimpio === '' ||
+    correo.trim() === '' ||
+    confirmarCorreo.trim() === '' ||
+    contrasena.trim() === '' ||
+    confirmarContrasena.trim() === ''
+  ) {
+    setMensajeError('Por favor completa todos los campos')
+    return
   }
+
+  if (
+    !formatoCorreo.test(correoLimpio) ||
+    !formatoCorreo.test(confirmarCorreoLimpio)
+  ) {
+    setMensajeError('Ingresa un correo válido')
+    return
+  }
+
+  if (contrasena.length < 8 || confirmarContrasena.length < 8) {
+    setMensajeError('La contraseña debe tener mínimo 8 caracteres')
+    return
+  }
+
+  if (correoLimpio !== confirmarCorreoLimpio) {
+    setMensajeError('Los correos no coinciden')
+    return
+  }
+
+  if (contrasena !== confirmarContrasena) {
+    setMensajeError('Las contraseñas no coinciden')
+    return
+  }
+
+  try {
+    setMensajeError('')
+    console.log('Intentando conectar...')
+
+    const respuesta = await fetch(
+      'https://dry-waves-work.loca.lt///auth/register',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nombre: nombreLimpio,
+          correo: correoLimpio,
+          password: contrasena,
+        }),
+      }
+    )
+
+    console.log('Status:', respuesta.status)
+
+    const textoRespuesta = await respuesta.text()
+    console.log('Respuesta cruda:', textoRespuesta)
+
+    let data: any = {}
+
+    try {
+      data = JSON.parse(textoRespuesta)
+    } catch {
+      data = {}
+    }
+
+    if (!respuesta.ok) {
+      setMensajeError(
+        data.mensaje ||
+          data.detail ||
+          'No se pudo registrar el usuario'
+      )
+      return
+    }
+
+    Alert.alert(
+      'Registro exitoso',
+      data.mensaje || data.detail || 'Usuario registrado correctamente'
+    )
+
+    setNombre('')
+    setCorreo('')
+    setConfirmarCorreo('')
+    setContrasena('')
+    setConfirmarContrasena('')
+    setMensajeError('')
+  } catch (error: any) {
+    console.log('Error completo:', error)
+    console.log('Mensaje:', error?.message)
+    setMensajeError('No se pudo conectar con el servidor')
+  }
+}
 
   return (
     <SafeAreaView style={styles.container}>
