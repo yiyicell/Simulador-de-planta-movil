@@ -4,7 +4,7 @@ Punto de entrada de la API REST.
 Correr con:
     uvicorn backend.main:app --reload
 
-Documentación interactiva disponible en:
+Documentación interactiva disponible en:`
     http://localhost:8000/docs
 """
 
@@ -12,10 +12,10 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
-import re
 
+from auth.login import autenticar_usuario
 from auth.register import registrar_usuario
-from auth.models import UsuarioRegistro
+from auth.models import UsuarioLogin, UsuarioRegistro
 from database import init_db, get_connection
 
 app = FastAPI(
@@ -42,6 +42,18 @@ class RegistroRequest(BaseModel):
     password: str
 
     @field_validator("nombre", "correo", "password")
+    @classmethod
+    def no_vacio(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("El campo no puede estar vacío")
+        return v
+
+
+class LoginRequest(BaseModel):
+    correo: str
+    password: str
+
+    @field_validator("correo", "password")
     @classmethod
     def no_vacio(cls, v: str) -> str:
         if not v.strip():
@@ -82,6 +94,39 @@ def register(datos: RegistroRequest):
 
     if not resultado["exito"]:
         return JSONResponse(status_code=400, content={"mensaje": resultado["mensaje"]})
+
+    u = resultado["usuario"]
+    return {
+        "mensaje": resultado["mensaje"],
+        "usuario": {
+            "id": u.id,
+            "nombre": u.nombre,
+            "correo": u.correo,
+            "creado": u.creado,
+        },
+    }
+
+
+@app.post("/auth/login", summary="Iniciar sesión")
+def login(datos: LoginRequest):
+    """
+    Autentica a un usuario registrado con correo y contraseña.
+
+    - **correo**: correo electrónico del usuario
+    - **password**: contraseña en texto plano para validación
+    """
+    resultado = autenticar_usuario(
+        UsuarioLogin(
+            correo=datos.correo,
+            password=datos.password,
+        )
+    )
+
+    if not resultado["exito"]:
+        status_code = 400
+        if resultado["mensaje"] == "Correo o contraseña incorrectos.":
+            status_code = 401
+        return JSONResponse(status_code=status_code, content={"mensaje": resultado["mensaje"]})
 
     u = resultado["usuario"]
     return {

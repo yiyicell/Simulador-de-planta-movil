@@ -16,6 +16,13 @@ class UsuarioRegistro:
 
 
 @dataclass
+class UsuarioLogin:
+    """Credenciales que llegan al endpoint de inicio de sesión."""
+    correo: str
+    password: str
+
+
+@dataclass
 class UsuarioRespuesta:
     """Datos públicos del usuario que se devuelven (sin password)."""
     id: int
