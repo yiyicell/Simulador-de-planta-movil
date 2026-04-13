@@ -81,7 +81,7 @@ export default function RegisterScreen() {
       setMensajeError('')
 
       const respuesta = await fetch(
-        'https://busy-kings-rhyme.loca.lt///auth/register',
+        'https://metal-ideas-talk.loca.lt///auth/register',
         {
           method: 'POST',
           headers: {

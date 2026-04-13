@@ -17,7 +17,7 @@ SplashScreen.preventAutoHideAsync()
 
 export default function LoginScreen() {
   const [correo, setCorreo] = useState('')
-  const [contrasena, setContrasena] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
 
   const [fontsLoaded, fontError] = useFonts({
@@ -35,10 +35,10 @@ export default function LoginScreen() {
     return null
   }
 
-  const manejarLogin = () => {
+  const manejarLogin = async () => {
     setError('')
 
-    if (!correo.trim() || !contrasena.trim()) {
+    if (!correo.trim() || !password.trim()) {
       setError('Completa todos los campos')
       return
     }
@@ -49,7 +49,31 @@ export default function LoginScreen() {
       return
     }
 
-    router.replace('/(tabs)')
+    try {
+      const respuesta = await fetch('https://metal-ideas-talk.loca.lt///auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          correo: correo.trim(),
+          password: password,
+        }),
+      })
+
+      const datos = await respuesta.json()
+
+      if (!respuesta.ok || !datos.exito) {
+        setError(datos.mensaje || 'No se pudo iniciar sesión')
+        return
+      }
+
+      console.log('Usuario autenticado:', datos.usuario)
+      router.replace('/(tabs)')
+    } catch (e) {
+      console.log('Error login:', e)
+      setError('No se pudo conectar con el servidor')
+    }
   }
 
   return (
@@ -79,8 +103,8 @@ export default function LoginScreen() {
           <TextInput
             style={styles.input}
             placeholder="Contraseña"
-            value={contrasena}
-            onChangeText={setContrasena}
+            value={password}
+            onChangeText={setPassword}
             secureTextEntry
           />
 
