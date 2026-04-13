@@ -33,8 +33,19 @@ def _validar_campos(datos: UsuarioRegistro) -> None:
     if not datos.password.strip():
         raise ValueError("La contraseña no puede estar vacía.")
 
+    correo = datos.correo.strip()
     patron_correo = r"^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$"
-    if not re.match(patron_correo, datos.correo.strip()):
+    if not re.match(patron_correo, correo):
+        raise ValueError("El formato del correo no es válido.")
+
+    local, dominio = correo.split("@", 1)
+    if (
+        ".." in correo
+        or local.startswith(".")
+        or local.endswith(".")
+        or dominio.startswith(".")
+        or dominio.endswith(".")
+    ):
         raise ValueError("El formato del correo no es válido.")
 
     if len(datos.password) < 8:
