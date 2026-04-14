@@ -50,7 +50,7 @@ export default function LoginScreen() {
     }
 
     try {
-      const respuesta = await fetch('https://metal-ideas-talk.loca.lt///auth/login', {
+      const respuesta = await fetch('https://nine-schools-win.loca.lt//auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

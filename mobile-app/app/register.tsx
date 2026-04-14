@@ -81,7 +81,7 @@ export default function RegisterScreen() {
       setMensajeError('')
 
       const respuesta = await fetch(
-        'https://metal-ideas-talk.loca.lt///auth/register',
+        'https://nine-schools-win.loca.lt//auth/register',
         {
           method: 'POST',
           headers: {
