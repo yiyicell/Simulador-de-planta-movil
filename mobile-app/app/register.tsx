@@ -22,7 +22,7 @@ export default function RegisterScreen() {
   const [mensajeError, setMensajeError] = useState('')
 
   const [fontsLoaded, fontError] = useFonts({
-    sunshine: require('../assets/fonts/a_little_sunshine.ttf'),
+    sunshine: require('../assets/fonts/Comfortaa-Regular.ttf'),
     superplants: require('../assets/fonts/super_plants.ttf'),
     })
 
@@ -81,7 +81,7 @@ export default function RegisterScreen() {
       setMensajeError('')
 
       const respuesta = await fetch(
-        'https://nine-schools-win.loca.lt//auth/register',
+        'https://stupid-coats-hammer.loca.lt/auth/register',
         {
           method: 'POST',
           headers: {
