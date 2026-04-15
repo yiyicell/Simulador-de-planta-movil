@@ -1,5 +1,7 @@
+import { useFonts } from 'expo-font'
 import { Link, router } from 'expo-router'
-import React, { useState, useEffect } from 'react'
+import * as SplashScreen from 'expo-splash-screen'
+import React, { useEffect, useState } from 'react'
 import {
   Image,
   KeyboardAvoidingView,
@@ -10,8 +12,6 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { useFonts } from 'expo-font'
-import * as SplashScreen from 'expo-splash-screen'
 
 SplashScreen.preventAutoHideAsync()
 
@@ -21,7 +21,7 @@ export default function LoginScreen() {
   const [error, setError] = useState('')
 
   const [fontsLoaded, fontError] = useFonts({
-    sunshine: require('../assets/fonts/a_little_sunshine.ttf'),
+    sunshine: require('../assets/fonts/Comfortaa-Regular.ttf'),
     superplants: require('../assets/fonts/super_plants.ttf'),
   })
 
@@ -50,26 +50,34 @@ export default function LoginScreen() {
     }
 
     try {
-      const respuesta = await fetch('https://nine-schools-win.loca.lt//auth/login', {
+      const respuesta = await fetch('https://stupid-coats-hammer.loca.lt/auth/login', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           correo: correo.trim(),
-          password: password,
+          password,
         }),
       })
 
-      const datos = await respuesta.json()
+      const textoRespuesta = await respuesta.text()
 
-      if (!respuesta.ok || !datos.exito) {
+      let datos: any = {}
+
+      try {
+        datos = JSON.parse(textoRespuesta)
+      } catch {
+        datos = {}
+      }
+
+      if (!respuesta.ok) {
         setError(datos.mensaje || 'No se pudo iniciar sesión')
         return
       }
 
       console.log('Usuario autenticado:', datos.usuario)
-      router.replace('/(tabs)')
+      router.replace('/(tabs)/home')
     } catch (e) {
       console.log('Error login:', e)
       setError('No se pudo conectar con el servidor')
@@ -94,6 +102,7 @@ export default function LoginScreen() {
           <TextInput
             style={styles.input}
             placeholder="Correo"
+            placeholderTextColor="#7a7a7a"
             value={correo}
             onChangeText={setCorreo}
             keyboardType="email-address"
@@ -103,6 +112,7 @@ export default function LoginScreen() {
           <TextInput
             style={styles.input}
             placeholder="Contraseña"
+            placeholderTextColor="#7a7a7a"
             value={password}
             onChangeText={setPassword}
             secureTextEntry
@@ -166,6 +176,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'sunshine',
     backgroundColor: '#ebf2e5',
+    color: '#2f241e',
   },
   error: {
     color: '#d62828',
