@@ -1,5 +1,5 @@
 import { Link, router } from 'expo-router'
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import {
   Alert,
   Image,
@@ -11,7 +11,6 @@ import {
   View,
 } from 'react-native'
 import { useFonts } from 'expo-font'
-import * as SplashScreen from 'expo-splash-screen'
 
 export default function RegisterScreen() {
   const [nombre, setNombre] = useState('')
@@ -24,17 +23,11 @@ export default function RegisterScreen() {
   const [fontsLoaded, fontError] = useFonts({
     sunshine: require('../assets/fonts/Comfortaa-Regular.ttf'),
     superplants: require('../assets/fonts/super_plants.ttf'),
-    })
+  })
 
-    useEffect(() => {
-        if (fontsLoaded || fontError) {
-        SplashScreen.hideAsync()
-        }
-    }, [fontsLoaded, fontError])
-
-    if (!fontsLoaded && !fontError) {
-        return null
-    }
+  if (!fontsLoaded && !fontError) {
+    return null
+  }
 
   const manejarRegistro = async () => {
     const correoLimpio = correo.trim().toLowerCase()
@@ -81,7 +74,7 @@ export default function RegisterScreen() {
       setMensajeError('')
 
       const respuesta = await fetch(
-        'https://stupid-coats-hammer.loca.lt/auth/register',
+        'https://rare-pots-melt.loca.lt/auth/register',
         {
           method: 'POST',
           headers: {
