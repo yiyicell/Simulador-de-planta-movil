@@ -9,11 +9,15 @@ Pasos que implementa:
 """
 
 import re
-import sqlite3
 import bcrypt
+import psycopg2
 
-from database import get_connection, init_db
-from auth.models import UsuarioLogin, UsuarioRespuesta
+try:
+    from backend.database import get_connection, init_db
+    from backend.auth.models import UsuarioLogin, UsuarioRespuesta
+except ModuleNotFoundError:
+    from database import get_connection, init_db
+    from auth.models import UsuarioLogin, UsuarioRespuesta
 
 
 def _validar_credenciales(datos: UsuarioLogin) -> None:
@@ -39,16 +43,24 @@ def _validar_credenciales(datos: UsuarioLogin) -> None:
         raise ValueError("El formato del correo no es válido.")
 
 
-def _obtener_usuario_por_correo(
-    correo: str, conn: sqlite3.Connection
-) -> sqlite3.Row | None:
+def _obtener_usuario_por_correo(correo: str, conn) -> tuple | None:
     """Recupera el usuario por correo o None si no existe."""
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT id, nombre, correo, password, creado FROM usuarios WHERE correo = ?",
+        "SELECT user_id, name, email, hashed_password, online, rol_admin, creation_date FROM \"user\" WHERE email = %s",
         (correo.strip().lower(),),
     )
     return cursor.fetchone()
+
+
+def _marcar_online(user_id: int, conn) -> None:
+    """Establece online=TRUE para el usuario dado."""
+    cursor = conn.cursor()
+    cursor.execute(
+        "UPDATE \"user\" SET online = TRUE WHERE user_id = %s",
+        (user_id,),
+    )
+    conn.commit()
 
 
 def _verificar_password(password: str, password_hash: str) -> bool:
@@ -77,18 +89,23 @@ def autenticar_usuario(datos: UsuarioLogin) -> dict:
     try:
         fila = _obtener_usuario_por_correo(datos.correo, conn)
 
-        if fila is None or not _verificar_password(datos.password, fila["password"]):
+        # fila: (id, nombre, correo, password, online, rol_admin, creado)
+        if fila is None or not _verificar_password(datos.password, fila[3]):
             return {
                 "exito": False,
                 "mensaje": "Correo o contraseña incorrectos.",
                 "usuario": None,
             }
 
+        _marcar_online(fila[0], conn)
+
         usuario_respuesta = UsuarioRespuesta(
-            id=fila["id"],
-            nombre=fila["nombre"],
-            correo=fila["correo"],
-            creado=fila["creado"],
+            id=fila[0],
+            nombre=fila[1],
+            correo=fila[2],
+            online=True,
+            rol_admin=fila[5],
+            creado=str(fila[6]),
         )
 
         return {
@@ -96,7 +113,7 @@ def autenticar_usuario(datos: UsuarioLogin) -> dict:
             "mensaje": "Inicio de sesión exitoso.",
             "usuario": usuario_respuesta,
         }
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
         return {
             "exito": False,
             "mensaje": f"Error en la base de datos: {e}",

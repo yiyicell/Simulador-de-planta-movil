@@ -28,4 +28,6 @@ class UsuarioRespuesta:
     id: int
     nombre: str
     correo: str
+    online: bool
+    rol_admin: bool
     creado: str

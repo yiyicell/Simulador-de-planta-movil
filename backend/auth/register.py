@@ -13,11 +13,15 @@ directamente desde el endpoint POST /auth/register.
 """
 
 import re
-import sqlite3
 import bcrypt
+import psycopg2
 
-from database import get_connection, init_db
-from auth.models import UsuarioRegistro, UsuarioRespuesta
+try:
+    from backend.database import get_connection, init_db
+    from backend.auth.models import UsuarioRegistro, UsuarioRespuesta
+except ModuleNotFoundError:
+    from database import get_connection, init_db
+    from auth.models import UsuarioRegistro, UsuarioRespuesta
 
 
 # ---------------------------------------------------------------------------
@@ -52,10 +56,10 @@ def _validar_campos(datos: UsuarioRegistro) -> None:
         raise ValueError("La contraseña debe tener al menos 8 caracteres.")
 
 
-def _correo_existe(correo: str, conn: sqlite3.Connection) -> bool:
+def _correo_existe(correo: str, conn) -> bool:
     """Retorna True si el correo ya está registrado en la base de datos."""
     cursor = conn.cursor()
-    cursor.execute("SELECT id FROM usuarios WHERE correo = ?", (correo.strip().lower(),))
+    cursor.execute("SELECT user_id FROM \"user\" WHERE email = %s", (correo.strip().lower(),))
     return cursor.fetchone() is not None
 
 
@@ -116,23 +120,24 @@ def registrar_usuario(datos: UsuarioRegistro) -> dict:
         # Paso 4: Guardar en base de datos
         cursor = conn.cursor()
         cursor.execute(
-            "INSERT INTO usuarios (nombre, correo, password) VALUES (?, ?, ?)",
+            """
+            INSERT INTO "user" (name, email, hashed_password, online, rol_admin)
+            VALUES (%s, %s, %s, FALSE, FALSE)
+            RETURNING user_id, name, email, online, rol_admin, creation_date
+            """,
             (datos.nombre.strip(), datos.correo.strip().lower(), password_hash),
         )
         conn.commit()
 
-        # Recuperar el usuario recién creado para la respuesta
-        cursor.execute(
-            "SELECT id, nombre, correo, creado FROM usuarios WHERE id = ?",
-            (cursor.lastrowid,),
-        )
         fila = cursor.fetchone()
 
         usuario_respuesta = UsuarioRespuesta(
-            id=fila["id"],
-            nombre=fila["nombre"],
-            correo=fila["correo"],
-            creado=fila["creado"],
+            id=fila[0],
+            nombre=fila[1],
+            correo=fila[2],
+            online=fila[3],
+            rol_admin=fila[4],
+            creado=str(fila[5]),
         )
 
         # Paso 5: Respuesta de éxito
@@ -142,7 +147,8 @@ def registrar_usuario(datos: UsuarioRegistro) -> dict:
             "usuario": usuario_respuesta,
         }
 
-    except sqlite3.Error as e:
+    except psycopg2.Error as e:
+        conn.rollback()
         return {
             "exito": False,
             "mensaje": f"Error en la base de datos: {e}",

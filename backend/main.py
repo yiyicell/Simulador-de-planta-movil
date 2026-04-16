@@ -15,6 +15,7 @@ from pydantic import BaseModel, field_validator
 
 from auth.login import autenticar_usuario
 from auth.register import registrar_usuario
+from auth.logout import cerrar_sesion
 from auth.models import UsuarioLogin, UsuarioRegistro
 from database import init_db, get_connection
 
@@ -102,6 +103,8 @@ def register(datos: RegistroRequest):
             "id": u.id,
             "nombre": u.nombre,
             "correo": u.correo,
+            "online": u.online,
+            "rol_admin": u.rol_admin,
             "creado": u.creado,
         },
     }
@@ -135,9 +138,25 @@ def login(datos: LoginRequest):
             "id": u.id,
             "nombre": u.nombre,
             "correo": u.correo,
+            "online": u.online,
+            "rol_admin": u.rol_admin,
             "creado": u.creado,
         },
     }
+
+
+@app.post("/auth/logout/{user_id}", summary="Cerrar sesión")
+def logout(user_id: int):
+    """
+    Cierra la sesión del usuario marcando `online = false`.
+
+    - **user_id**: ID del usuario que cierra sesión
+    """
+    resultado = cerrar_sesion(user_id)
+    if not resultado["exito"]:
+        status_code = 400 if "inválido" in resultado["mensaje"] else 404
+        return JSONResponse(status_code=status_code, content={"mensaje": resultado["mensaje"]})
+    return {"mensaje": resultado["mensaje"]}
 
 
 @app.get("/auth/users", summary="Listar usuarios registrados")
@@ -148,8 +167,11 @@ def list_users():
     No incluye la contraseña.
     """
     conn = get_connection()
-    rows = conn.execute(
-        "SELECT id, nombre, correo, creado FROM usuarios ORDER BY creado DESC"
-    ).fetchall()
+    cursor = conn.cursor()
+    cursor.execute(
+        'SELECT user_id, name, email, online, rol_admin, creation_date FROM "user" ORDER BY creation_date DESC'
+    )
+    cols = [desc[0] for desc in cursor.description]
+    rows = [dict(zip(cols, row)) for row in cursor.fetchall()]
     conn.close()
-    return {"usuarios": [dict(row) for row in rows]}
+    return {"usuarios": rows}
