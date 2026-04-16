@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react'
+import { router } from 'expo-router'
+import React, { useEffect, useMemo, useState } from 'react'
 import {
+  ActivityIndicator,
   Image,
   Modal,
   Pressable,
@@ -8,6 +10,9 @@ import {
   Text,
   View,
 } from 'react-native'
+
+import { API_BASE_URL } from '@/constants/api'
+import { useSession } from '@/context/session'
 
 type ClaveModal =
   | 'perfil'
@@ -39,8 +44,18 @@ const imagenes = {
 
 export default function HomeScreen() {
   const [modalActivo, setModalActivo] = useState<ClaveModal | null>(null)
+  const [cerrandoSesion, setCerrandoSesion] = useState(false)
+  const [errorModal, setErrorModal] = useState('')
+  const { usuario, cerrarSesionLocal } = useSession()
+
+  useEffect(() => {
+    if (!usuario) {
+      router.replace('/login')
+    }
+  }, [usuario])
 
   const abrirModal = (clave: ClaveModal) => {
+    setErrorModal('')
     setModalActivo(clave)
   }
 
@@ -52,48 +67,84 @@ export default function HomeScreen() {
     const contenido: Record<ClaveModal, { titulo: string; texto: string }> = {
       perfil: {
         titulo: 'Perfil',
-        texto:
-          'Aquí luego irá la información del usuario, edición de datos y configuración personal.',
+        texto: 'Consulta aqui los datos de tu sesion actual.',
       },
       opciones: {
         titulo: 'Opciones',
         texto:
-          'Aquí luego podrán ir ajustes generales de la app, sonido, ayuda y otras configuraciones.',
+          'Aqui luego podran ir ajustes generales de la app, sonido, ayuda y otras configuraciones.',
       },
       salud: {
         titulo: 'Salud de la planta',
         texto:
-          'Esta barra mostrará el estado general de la planta según sus cuidados y condiciones.',
+          'Esta barra mostrara el estado general de la planta segun sus cuidados y condiciones.',
       },
       maceta: {
         titulo: 'Maceta',
         texto:
-          'Aquí luego podrás ver o cambiar información relacionada con la maceta de la planta.',
+          'Aqui luego podras ver o cambiar informacion relacionada con la maceta de la planta.',
       },
       sustrato: {
         titulo: 'Sustrato',
         texto:
-          'Aquí luego podrás consultar el tipo de sustrato, su estado y posibles recomendaciones.',
+          'Aqui luego podras consultar el tipo de sustrato, su estado y posibles recomendaciones.',
       },
       historial: {
         titulo: 'Historial de registro',
         texto:
-          'Aquí luego aparecerán los registros y eventos guardados sobre el cuidado de la planta.',
+          'Aqui luego apareceran los registros y eventos guardados sobre el cuidado de la planta.',
       },
       intensidad: {
         titulo: 'Intensidad',
         texto:
-          'Aquí luego podrás ajustar o consultar la intensidad de luz que recibe la planta.',
+          'Aqui luego podras ajustar o consultar la intensidad de luz que recibe la planta.',
       },
       riego: {
         titulo: 'Riego',
         texto:
-          'Aquí luego podrás registrar el riego o revisar el estado actual del agua.',
+          'Aqui luego podras registrar el riego o revisar el estado actual del agua.',
       },
     }
 
     return modalActivo ? contenido[modalActivo] : null
   }, [modalActivo])
+
+  const manejarCerrarSesion = async () => {
+    if (!usuario || cerrandoSesion) {
+      return
+    }
+
+    setCerrandoSesion(true)
+    setErrorModal('')
+
+    try {
+      const respuesta = await fetch(`${API_BASE_URL}/auth/logout/${usuario.id}`, {
+        method: 'POST',
+      })
+
+      const textoRespuesta = await respuesta.text()
+      let datos: { mensaje?: string } = {}
+
+      try {
+        datos = JSON.parse(textoRespuesta)
+      } catch {
+        datos = {}
+      }
+
+      if (!respuesta.ok) {
+        console.log('Logout no confirmado por backend:', datos.mensaje)
+      }
+    } catch (error) {
+      console.log('Error logout:', error)
+    } finally {
+      cerrarSesionLocal()
+      cerrarModal()
+      router.replace('/login')
+      setCerrandoSesion(false)
+    }
+  }
+
+  const creadoTexto = usuario?.creado || 'Sin fecha registrada'
 
   const opcionesInferiores: Array<{
     clave: ClaveModal
@@ -189,7 +240,61 @@ export default function HomeScreen() {
 
           <View style={styles.tarjetaModal}>
             <Text style={styles.tituloModal}>{contenidoModal?.titulo}</Text>
-            <Text style={styles.textoModal}>{contenidoModal?.texto}</Text>
+
+            {modalActivo === 'perfil' ? (
+              <View style={styles.contenidoPerfil}>
+                <View style={styles.tarjetaPerfil}>
+                  <View style={styles.encabezadoPerfil}>
+                    <View style={styles.puntoEstado} />
+                    <View style={styles.textosPerfil}>
+                      <Text style={styles.nombrePerfil}>
+                        {usuario?.nombre || 'No disponible'}
+                      </Text>
+                      <Text style={styles.correoPerfil}>
+                        {usuario?.correo || 'No disponible'}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.separadorPerfil} />
+
+                  <View style={styles.filaDato}>
+                    <Text style={styles.etiquetaDato}>Numero de plantas:</Text>
+                    <Text style={styles.valorDato}>0</Text>
+                  </View>
+
+                  <View style={styles.filaDato}>
+                    <Text style={styles.etiquetaDato}>Jardinero desde:</Text>
+                    <Text style={styles.valorDato}>{creadoTexto}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : modalActivo === 'opciones' ? (
+              <View style={styles.contenidoPerfil}>
+                <Text style={styles.textoModal}>{contenidoModal?.texto}</Text>
+
+                {errorModal ? (
+                  <Text style={styles.errorPerfil}>{errorModal}</Text>
+                ) : null}
+
+                <Pressable
+                  style={[
+                    styles.botonCerrarSesion,
+                    cerrandoSesion && styles.botonCerrarSesionDeshabilitado,
+                  ]}
+                  onPress={manejarCerrarSesion}
+                  disabled={cerrandoSesion}
+                >
+                  {cerrandoSesion ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <Text style={styles.textoCerrarSesion}>Cerrar sesion</Text>
+                  )}
+                </Pressable>
+              </View>
+            ) : (
+              <Text style={styles.textoModal}>{contenidoModal?.texto}</Text>
+            )}
 
             <Pressable style={styles.botonCerrar} onPress={cerrarModal}>
               <Text style={styles.textoCerrar}>Cerrar</Text>
@@ -337,7 +442,88 @@ const styles = StyleSheet.create({
     color: '#d7d7d7',
     fontSize: 15,
     lineHeight: 22,
+  },
+  contenidoPerfil: {
+    gap: 14,
     marginBottom: 18,
+  },
+  tarjetaPerfil: {
+    borderRadius: 14,
+    backgroundColor: '#1b1b1b',
+    borderWidth: 1,
+    borderColor: '#2b2b2b',
+    padding: 16,
+    gap: 14,
+  },
+  encabezadoPerfil: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  puntoEstado: {
+    width: 12,
+    height: 12,
+    borderRadius: 999,
+    backgroundColor: '#46a11f',
+    shadowColor: '#46a11f',
+    shadowOpacity: 0.4,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+  },
+  textosPerfil: {
+    flex: 1,
+    gap: 3,
+  },
+  nombrePerfil: {
+    color: '#f3f3f3',
+    fontSize: 22,
+    fontWeight: '700',
+    lineHeight: 28,
+  },
+  correoPerfil: {
+    color: '#bdbdbd',
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  separadorPerfil: {
+    height: 1,
+    backgroundColor: '#2b2b2b',
+  },
+  filaDato: {
+    gap: 4,
+  },
+  etiquetaDato: {
+    color: '#8cbf71',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  valorDato: {
+    color: '#f3f3f3',
+    fontSize: 15,
+    lineHeight: 21,
+  },
+  errorPerfil: {
+    color: '#ff8f8f',
+    fontSize: 14,
+  },
+  botonCerrarSesion: {
+    backgroundColor: '#b63838',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 46,
+  },
+  botonCerrarSesionDeshabilitado: {
+    opacity: 0.7,
+  },
+  textoCerrarSesion: {
+    color: '#ffffff',
+    fontWeight: '700',
+    fontSize: 15,
   },
   botonCerrar: {
     alignSelf: 'flex-end',

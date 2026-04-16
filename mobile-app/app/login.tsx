@@ -1,7 +1,6 @@
 import { useFonts } from 'expo-font'
 import { Link, router } from 'expo-router'
-import * as SplashScreen from 'expo-splash-screen'
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import {
   Image,
   KeyboardAvoidingView,
@@ -13,23 +12,19 @@ import {
   View,
 } from 'react-native'
 
-SplashScreen.preventAutoHideAsync()
+import { API_BASE_URL } from '@/constants/api'
+import { useSession } from '@/context/session'
 
 export default function LoginScreen() {
   const [correo, setCorreo] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const { setUsuario } = useSession()
 
   const [fontsLoaded, fontError] = useFonts({
     sunshine: require('../assets/fonts/Comfortaa-Regular.ttf'),
     superplants: require('../assets/fonts/super_plants.ttf'),
   })
-
-  useEffect(() => {
-    if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync()
-    }
-  }, [fontsLoaded, fontError])
 
   if (!fontsLoaded && !fontError) {
     return null
@@ -50,7 +45,7 @@ export default function LoginScreen() {
     }
 
     try {
-      const respuesta = await fetch('https://stupid-coats-hammer.loca.lt/auth/login', {
+      const respuesta = await fetch(`${API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -77,6 +72,7 @@ export default function LoginScreen() {
       }
 
       console.log('Usuario autenticado:', datos.usuario)
+      setUsuario(datos.usuario)
       router.replace('/(tabs)/home')
     } catch (e) {
       console.log('Error login:', e)
