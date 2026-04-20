@@ -154,5 +154,17 @@ def init_db() -> None:
         )
     """)
 
+    # Tokens de recuperación de contraseña
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS token (
+            token_id    SERIAL PRIMARY KEY,
+            fk_user_id  INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+            token       CHARACTER VARYING(64) NOT NULL UNIQUE,
+            expiration  TIMESTAMP NOT NULL,
+            available   BOOLEAN NOT NULL DEFAULT TRUE,
+            active      BOOLEAN NOT NULL DEFAULT TRUE
+        )
+    """)
+
     conn.commit()
     conn.close()

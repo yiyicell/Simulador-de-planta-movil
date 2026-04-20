@@ -10,3 +10,4 @@ uvicorn[standard]==0.32.0
 pydantic==2.9.2
 pyngrok>=7.0.0          # Túnel público para desarrollo
 apscheduler>=3.10       # Scheduler para decaimiento periódico de plantas
+# smtplib y ssl son parte de la stdlib de Python — no requieren instalación

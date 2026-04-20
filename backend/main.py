@@ -17,6 +17,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from auth.login import autenticar_usuario
 from auth.register import registrar_usuario
 from auth.logout import cerrar_sesion
+from auth.password_reset import solicitar_recuperacion, restablecer_password
 from auth.models import UsuarioLogin, UsuarioRegistro
 from database import init_db, get_connection
 from plant.create import crear_planta, contar_plantas_usuario
@@ -64,6 +65,31 @@ class LoginRequest(BaseModel):
     password: str
 
     @field_validator("correo", "password")
+    @classmethod
+    def no_vacio(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("El campo no puede estar vacío")
+        return v
+
+
+class SolicitudRecuperacionRequest(BaseModel):
+    correo: str
+
+    @field_validator("correo")
+    @classmethod
+    def no_vacio(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("El campo no puede estar vacío")
+        return v
+
+
+class RestablecerPasswordRequest(BaseModel):
+    correo: str
+    token: str
+    nueva_password: str
+    confirmar_password: str
+
+    @field_validator("correo", "token", "nueva_password", "confirmar_password")
     @classmethod
     def no_vacio(cls, v: str) -> str:
         if not v.strip():
@@ -218,6 +244,43 @@ def logout(user_id: int):
     if not resultado["exito"]:
         status_code = 400 if "inválido" in resultado["mensaje"] else 404
         return JSONResponse(status_code=status_code, content={"mensaje": resultado["mensaje"]})
+    return {"mensaje": resultado["mensaje"]}
+
+
+@app.post("/auth/forgot-password", summary="Solicitar recuperación de contraseña")
+def forgot_password(datos: SolicitudRecuperacionRequest):
+    """
+    Genera un token de recuperación y lo envía al correo indicado.
+
+    Por seguridad, siempre retorna el mismo mensaje sin importar
+    si el correo está registrado o no (anti-enumeración).
+
+    - **correo**: correo electrónico asociado a la cuenta
+    """
+    resultado = solicitar_recuperacion(datos.correo)
+    if not resultado["exito"]:
+        return JSONResponse(status_code=400, content={"mensaje": resultado["mensaje"]})
+    return {"mensaje": resultado["mensaje"]}
+
+
+@app.post("/auth/reset-password", summary="Restablecer contraseña con token")
+def reset_password(datos: RestablecerPasswordRequest):
+    """
+    Valida el token recibido por correo y actualiza la contraseña.
+
+    - **correo**: correo electrónico de la cuenta
+    - **token**: token de 64 caracteres recibido por correo
+    - **nueva_password**: nueva contraseña (mínimo 8 caracteres)
+    - **confirmar_password**: debe coincidir con nueva_password
+    """
+    resultado = restablecer_password(
+        correo=datos.correo,
+        token=datos.token,
+        nueva_password=datos.nueva_password,
+        confirmar_password=datos.confirmar_password,
+    )
+    if not resultado["exito"]:
+        return JSONResponse(status_code=400, content={"mensaje": resultado["mensaje"]})
     return {"mensaje": resultado["mensaje"]}
 
 
