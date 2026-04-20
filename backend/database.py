@@ -46,5 +46,99 @@ def init_db() -> None:
         )
     """)
 
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS plant (
+            id_plant            SERIAL PRIMARY KEY,
+            plant_name          CHARACTER VARYING(100) NOT NULL,
+            plant_type          CHARACTER VARYING(50),
+            water_level         DOUBLE PRECISION DEFAULT 30.0,
+            light_level         DOUBLE PRECISION DEFAULT 40.0,
+            humidity_level      DOUBLE PRECISION DEFAULT 60.0,
+            health              DOUBLE PRECISION DEFAULT 0.0,
+            growth_stage        CHARACTER VARYING(50) DEFAULT 'germinacion',
+            total_care_actions  INTEGER DEFAULT 0,
+            creation_date_plant DATE DEFAULT CURRENT_DATE,
+            fk_user_id          INTEGER NOT NULL REFERENCES "user"(user_id)
+        )
+    """)
+
+    # Migración segura: agrega columnas nuevas si la tabla ya existía sin ellas
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'plant' AND column_name = 'growth_stage'
+            ) THEN
+                ALTER TABLE plant ADD COLUMN growth_stage CHARACTER VARYING(50) DEFAULT 'germinacion';
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'plant' AND column_name = 'total_care_actions'
+            ) THEN
+                ALTER TABLE plant ADD COLUMN total_care_actions INTEGER DEFAULT 0;
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'plant' AND column_name = 'ventilation_level'
+            ) THEN
+                ALTER TABLE plant ADD COLUMN ventilation_level DOUBLE PRECISION DEFAULT 50.0;
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'plant' AND column_name = 'fk_substrate_type'
+            ) THEN
+                ALTER TABLE plant ADD COLUMN fk_substrate_type INTEGER;
+            END IF;
+        END$$;
+    """)
+
+    # Catálogo de tipos de sustrato
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS substrate_type (
+            id_substrate_type  SERIAL PRIMARY KEY,
+            name               CHARACTER VARYING(50) NOT NULL UNIQUE,
+            description        TEXT,
+            water_retention    DOUBLE PRECISION DEFAULT 1.0,
+            nutrient_release   DOUBLE PRECISION DEFAULT 1.0,
+            drainage_factor    DOUBLE PRECISION DEFAULT 1.0
+        )
+    """)
+
+    # Pre-cargar tipos de sustrato (ON CONFLICT DO NOTHING para idempotencia)
+    cursor.execute("""
+        INSERT INTO substrate_type (name, description, water_retention, nutrient_release, drainage_factor)
+        VALUES
+            ('corteza',        'Corteza de pino. Excelente drenaje, poca retención. Ideal para orquídeas.', 0.7, 0.8, 1.4),
+            ('musgo_sphagnum', 'Musgo sphagnum. Alta retención de humedad y agua.',                         1.5, 1.2, 0.6),
+            ('perlita',        'Perlita volcánica. Drenaje máximo, retención mínima.',                      0.5, 0.5, 1.8),
+            ('mixto',          'Mezcla balanceada para uso general.',                                       1.0, 1.0, 1.0)
+        ON CONFLICT (name) DO NOTHING
+    """)
+
+    # Maceta (1:1 con planta)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pot (
+            id_pot             SERIAL PRIMARY KEY,
+            material           CHARACTER VARYING(50) DEFAULT 'plastico',
+            size_cm            INTEGER DEFAULT 15,
+            drainage_level     DOUBLE PRECISION DEFAULT 60.0,
+            ventilation_level  DOUBLE PRECISION DEFAULT 50.0,
+            fk_plant_id        INTEGER NOT NULL UNIQUE REFERENCES plant(id_plant)
+        )
+    """)
+
+    # Historial de acciones de cuidado
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS care_history (
+            id_history   SERIAL PRIMARY KEY,
+            fk_plant_id  INTEGER NOT NULL REFERENCES plant(id_plant),
+            action_type  CHARACTER VARYING(50) NOT NULL,
+            value        DOUBLE PRECISION,
+            extra_info   TEXT,
+            created_at   TIMESTAMP DEFAULT NOW()
+        )
+    """)
+
     conn.commit()
     conn.close()
