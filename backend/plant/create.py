@@ -75,8 +75,9 @@ def crear_planta(datos: PlantaCrear) -> dict:
                 plant_name, plant_type,
                 water_level, light_level, humidity_level, health,
                 growth_stage, total_care_actions,
-                creation_date_plant, fk_user_id, ventilation_level
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                creation_date_plant, fk_user_id, ventilation_level,
+                is_dead, last_decay_at
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, FALSE, NOW())
             RETURNING id_plant
             """,
             (
@@ -116,7 +117,8 @@ def crear_planta(datos: PlantaCrear) -> dict:
                    p.growth_stage, p.total_care_actions,
                    p.creation_date_plant, p.fk_user_id,
                    COALESCE(p.ventilation_level, 50.0),
-                   COALESCE(st.name, 'mixto')
+                   COALESCE(st.name, 'mixto'),
+                   COALESCE(p.is_dead, FALSE)
             FROM plant p
             LEFT JOIN substrate_type st ON st.id_substrate_type = p.fk_substrate_type
             WHERE p.id_plant = %s
@@ -139,6 +141,7 @@ def crear_planta(datos: PlantaCrear) -> dict:
             fk_user_id=row[10],
             ventilation_level=row[11] or 50.0,
             substrate_name=row[12] or "mixto",
+            is_dead=bool(row[13]),
         )
         return {
             "exito": True,
@@ -173,10 +176,11 @@ def contar_plantas_usuario(user_id: int) -> dict:
                    p.growth_stage, p.total_care_actions,
                    p.creation_date_plant, p.fk_user_id,
                    COALESCE(p.ventilation_level, 50.0),
-                   COALESCE(st.name, 'mixto')
+                   COALESCE(st.name, 'mixto'),
+                   COALESCE(p.is_dead, FALSE)
             FROM plant p
             LEFT JOIN substrate_type st ON st.id_substrate_type = p.fk_substrate_type
-            WHERE p.fk_user_id = %s
+            WHERE p.fk_user_id = %s AND COALESCE(p.is_dead, FALSE) = FALSE
             ORDER BY p.creation_date_plant ASC
             """,
             (user_id,),
@@ -197,6 +201,7 @@ def contar_plantas_usuario(user_id: int) -> dict:
                 fk_user_id=r[10],
                 ventilation_level=r[11] or 50.0,
                 substrate_name=r[12] or "mixto",
+                is_dead=bool(r[13]),
             )
             for r in rows
         ]

@@ -29,6 +29,7 @@ class PlantaRespuesta:
     fk_user_id: int
     ventilation_level: float = 50.0   # nivel de ventilación ambiental (0–100)
     substrate_name: str = "mixto"     # nombre del sustrato asignado
+    is_dead: bool = False             # True cuando la salud llegó a 0
 
 
 @dataclass

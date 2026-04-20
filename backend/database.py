@@ -58,7 +58,9 @@ def init_db() -> None:
             growth_stage        CHARACTER VARYING(50) DEFAULT 'germinacion',
             total_care_actions  INTEGER DEFAULT 0,
             creation_date_plant DATE DEFAULT CURRENT_DATE,
-            fk_user_id          INTEGER NOT NULL REFERENCES "user"(user_id)
+            fk_user_id          INTEGER NOT NULL REFERENCES "user"(user_id),
+            is_dead             BOOLEAN DEFAULT FALSE,
+            last_decay_at       TIMESTAMP DEFAULT NOW()
         )
     """)
 
@@ -89,6 +91,18 @@ def init_db() -> None:
                 WHERE table_name = 'plant' AND column_name = 'fk_substrate_type'
             ) THEN
                 ALTER TABLE plant ADD COLUMN fk_substrate_type INTEGER;
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'plant' AND column_name = 'is_dead'
+            ) THEN
+                ALTER TABLE plant ADD COLUMN is_dead BOOLEAN DEFAULT FALSE;
+            END IF;
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'plant' AND column_name = 'last_decay_at'
+            ) THEN
+                ALTER TABLE plant ADD COLUMN last_decay_at TIMESTAMP DEFAULT NOW();
             END IF;
         END$$;
     """)

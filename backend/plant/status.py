@@ -53,7 +53,8 @@ def obtener_estado(plant_id: int) -> dict:
                    p.growth_stage, p.total_care_actions,
                    p.creation_date_plant, p.fk_user_id,
                    COALESCE(p.ventilation_level, 50.0),
-                   COALESCE(st.name, 'mixto')
+                   COALESCE(st.name, 'mixto'),
+                   COALESCE(p.is_dead, FALSE)
             FROM plant p
             LEFT JOIN substrate_type st ON st.id_substrate_type = p.fk_substrate_type
             WHERE p.id_plant = %s
@@ -72,6 +73,34 @@ def obtener_estado(plant_id: int) -> dict:
         tipo_planta    = row[2] or ""
         ventilation    = row[11] or 50.0
         substrate_name = row[12] or "mixto"
+        is_dead        = bool(row[13])
+
+        # Si la planta está muerta devolvemos su último estado sin recalcular
+        if is_dead:
+            planta = PlantaRespuesta(
+                id_plant=row[0],
+                plant_name=row[1],
+                plant_type=tipo_planta,
+                water_level=water_level,
+                light_level=light_level,
+                humidity_level=humidity_level,
+                health=0.0,
+                growth_stage="muerta",
+                total_care_actions=total_acciones,
+                creation_date_plant=str(row[9]),
+                fk_user_id=row[10],
+                ventilation_level=ventilation,
+                substrate_name=substrate_name,
+                is_dead=True,
+            )
+            return {
+                "exito":             True,
+                "mensaje":           "La planta ha muerto.",
+                "planta":            planta,
+                "salud_etiqueta":    "Muerta",
+                "etapa_descripcion": "La planta no recibió los cuidados necesarios y falleció.",
+                "alertas":           ["💀 Esta planta ha muerto. Debes crear una nueva planta."],
+            }
 
         salud_actual = calcular_salud(water_level, light_level, humidity_level, ventilation)
         etapa_actual = obtener_etapa(total_acciones, tipo_planta, salud_actual)
@@ -90,6 +119,7 @@ def obtener_estado(plant_id: int) -> dict:
             fk_user_id=row[10],
             ventilation_level=ventilation,
             substrate_name=substrate_name,
+            is_dead=False,
         )
 
         return {

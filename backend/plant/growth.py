@@ -133,12 +133,29 @@ def calcular_salud(
     Calcula la salud general de la planta (0–100) como promedio ponderado.
     Pesos: agua 35 %, luz 25 %, humedad 25 %, ventilación 15 %.
     ventilation_level tiene default 50.0 (óptimo) para compatibilidad.
+
+    Penalizaciones por condición extrema:
+      Deshidratación severa (agua ≤ critico_bajo = 10):
+        La planta no puede realizar fotosíntesis. Multiplicador ×0.35.
+        → Permite que la salud llegue a 0 cuando agua=0 y humedad=0.
+
+      Encharcamiento severo (agua ≥ critico_alto = 95):
+        Las raíces no pueden respirar ni absorber nutrientes por pudrición.
+        Multiplicador ×0.50. Más recuperable que la sequía (basta con
+        mejorar el drenaje / sustrato).
     """
     pw = _puntaje_factor(water_level,       REGLAS_AGUA)
     pl = _puntaje_factor(light_level,       REGLAS_LUZ)
     ph = _puntaje_factor(humidity_level,    REGLAS_HUMEDAD)
     pv = _puntaje_factor(ventilation_level, REGLAS_VENTILACION)
-    return round(pw * 0.35 + pl * 0.25 + ph * 0.25 + pv * 0.15, 2)
+    salud = pw * 0.35 + pl * 0.25 + ph * 0.25 + pv * 0.15
+
+    if water_level <= REGLAS_AGUA["critico_bajo"]:
+        salud *= 0.35
+    elif water_level >= REGLAS_AGUA["critico_alto"]:
+        salud *= 0.50
+
+    return round(salud, 2)
 
 
 def obtener_etapa(total_acciones: int, tipo_planta: str, health: float = 100.0) -> str:

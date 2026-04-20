@@ -12,6 +12,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, field_validator
+from apscheduler.schedulers.background import BackgroundScheduler
 
 from auth.login import autenticar_usuario
 from auth.register import registrar_usuario
@@ -25,6 +26,7 @@ from plant.models import PlantaCrear
 from plant.substrate import obtener_tipos_sustrato, asignar_sustrato
 from plant.pot import obtener_maceta, actualizar_maceta
 from plant.history import obtener_historial
+from plant.decay import calcular_decaimiento, INTERVALO_MINUTOS
 
 app = FastAPI(
     title="Simulador de Planta Móvil — API",
@@ -111,8 +113,25 @@ class MacetaRequest(BaseModel):
 
 @app.on_event("startup")
 def startup():
-    """Crea las tablas si no existen al iniciar el servidor."""
+    """Crea las tablas si no existen e inicia el scheduler de decaimiento."""
     init_db()
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(
+        calcular_decaimiento,
+        trigger="interval",
+        minutes=INTERVALO_MINUTOS,
+        id="decay_job",
+        replace_existing=True,
+    )
+    scheduler.start()
+    app.state.scheduler = scheduler
+
+
+@app.on_event("shutdown")
+def shutdown():
+    """Detiene el scheduler al cerrar el servidor."""
+    if hasattr(app.state, "scheduler"):
+        app.state.scheduler.shutdown(wait=False)
 
 
 # ---------------------------------------------------------------------------
@@ -247,6 +266,7 @@ def get_plantas_usuario(user_id: int):
             "total_care_actions": p.total_care_actions,
             "creation_date_plant": p.creation_date_plant,
             "fk_user_id":         p.fk_user_id,
+            "is_dead":            p.is_dead,
         }
         for p in resultado["plantas"]
     ]
@@ -290,6 +310,7 @@ def post_crear_planta(datos: CrearPlantaRequest):
             "total_care_actions": p.total_care_actions,
             "creation_date_plant": p.creation_date_plant,
             "fk_user_id":         p.fk_user_id,
+            "is_dead":            p.is_dead,
         },
     }
 
