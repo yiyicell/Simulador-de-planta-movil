@@ -1,0 +1,11 @@
+# Dependencias del backend
+# Instalar con: pip install -r requirements.txt
+
+bcrypt==4.2.1          # Hash seguro de contraseñas
+psycopg2-binary>=2.9   # Conector PostgreSQL
+python-dotenv>=1.0     # Variables de entorno desde .env
+
+fastapi==0.115.0
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+pyngrok>=7.0.0          # Túnel público para desarrollo
