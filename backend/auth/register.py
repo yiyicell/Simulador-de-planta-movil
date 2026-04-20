@@ -121,8 +121,8 @@ def registrar_usuario(datos: UsuarioRegistro) -> dict:
         cursor = conn.cursor()
         cursor.execute(
             """
-            INSERT INTO "user" (name, email, hashed_password, online, rol_admin)
-            VALUES (%s, %s, %s, FALSE, FALSE)
+            INSERT INTO "user" (name, email, hashed_password, online, rol_admin, creation_date)
+            VALUES (%s, %s, %s, FALSE, FALSE, CURRENT_DATE)
             RETURNING user_id, name, email, online, rol_admin, creation_date
             """,
             (datos.nombre.strip(), datos.correo.strip().lower(), password_hash),
