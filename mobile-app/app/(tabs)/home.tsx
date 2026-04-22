@@ -46,13 +46,18 @@ export default function HomeScreen() {
   const [modalActivo, setModalActivo] = useState<ClaveModal | null>(null)
   const [cerrandoSesion, setCerrandoSesion] = useState(false)
   const [errorModal, setErrorModal] = useState('')
-  const { usuario, cerrarSesionLocal } = useSession()
+  const { plantaActual, usuario, cerrarSesionLocal } = useSession()
 
   useEffect(() => {
     if (!usuario) {
       router.replace('/login')
+      return
     }
-  }, [usuario])
+
+    if (!plantaActual) {
+      router.replace('/select-plant')
+    }
+  }, [plantaActual, usuario])
 
   const abrirModal = (clave: ClaveModal) => {
     setErrorModal('')
@@ -260,7 +265,16 @@ export default function HomeScreen() {
 
                   <View style={styles.filaDato}>
                     <Text style={styles.etiquetaDato}>Numero de plantas:</Text>
-                    <Text style={styles.valorDato}>0</Text>
+                    <Text style={styles.valorDato}>
+                      {plantaActual ? '1' : '0'}
+                    </Text>
+                  </View>
+
+                  <View style={styles.filaDato}>
+                    <Text style={styles.etiquetaDato}>Planta activa:</Text>
+                    <Text style={styles.valorDato}>
+                      {plantaActual?.nombre || 'Sin planta seleccionada'}
+                    </Text>
                   </View>
 
                   <View style={styles.filaDato}>

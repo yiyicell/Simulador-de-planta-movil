@@ -2,6 +2,7 @@ import { useFonts } from 'expo-font'
 import { Link, router } from 'expo-router'
 import React, { useState } from 'react'
 import {
+  ActivityIndicator,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -19,7 +20,8 @@ export default function LoginScreen() {
   const [correo, setCorreo] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
-  const { setUsuario } = useSession()
+  const [cargando, setCargando] = useState(false)
+  const { setPlantaActual, setUsuario } = useSession()
 
   const [fontsLoaded, fontError] = useFonts({
     sunshine: require('../assets/fonts/Comfortaa-Regular.ttf'),
@@ -31,16 +33,23 @@ export default function LoginScreen() {
   }
 
   const manejarLogin = async () => {
+    if (cargando) {
+      return
+    }
+
     setError('')
+    setCargando(true)
 
     if (!correo.trim() || !password.trim()) {
       setError('Completa todos los campos')
+      setCargando(false)
       return
     }
 
     const correoValido = /\S+@\S+\.\S+/.test(correo)
     if (!correoValido) {
-      setError('Ingresa un correo válido')
+      setError('Ingresa un correo valido')
+      setCargando(false)
       return
     }
 
@@ -67,16 +76,51 @@ export default function LoginScreen() {
       }
 
       if (!respuesta.ok) {
-        setError(datos.mensaje || 'No se pudo iniciar sesión')
+        setError(datos.mensaje || 'No se pudo iniciar sesion')
         return
       }
 
-      console.log('Usuario autenticado:', datos.usuario)
       setUsuario(datos.usuario)
-      router.replace('/(tabs)/home')
+
+      const respuestaPlantas = await fetch(
+        `${API_BASE_URL}/plants/user/${datos.usuario.id}`
+      )
+
+      const textoPlantas = await respuestaPlantas.text()
+      let datosPlantas: any = {}
+
+      try {
+        datosPlantas = JSON.parse(textoPlantas)
+      } catch {
+        datosPlantas = {}
+      }
+
+      if (!respuestaPlantas.ok) {
+        setError(datosPlantas.mensaje || 'No se pudo consultar la planta')
+        setUsuario(null)
+        setPlantaActual(null)
+        return
+      }
+
+      const primeraPlanta = datosPlantas.plantas?.[0]
+
+      if (primeraPlanta) {
+        setPlantaActual({
+          id: primeraPlanta.id_plant,
+          nombre: primeraPlanta.plant_name,
+          tipo: primeraPlanta.plant_type,
+        })
+        router.replace('/(tabs)/home')
+        return
+      }
+
+      setPlantaActual(null)
+      router.replace('/select-plant')
     } catch (e) {
       console.log('Error login:', e)
       setError('No se pudo conectar con el servidor')
+    } finally {
+      setCargando(false)
     }
   }
 
@@ -107,7 +151,7 @@ export default function LoginScreen() {
 
           <TextInput
             style={styles.input}
-            placeholder="Contraseña"
+            placeholder="Contrasena"
             placeholderTextColor="#7a7a7a"
             value={password}
             onChangeText={setPassword}
@@ -117,17 +161,25 @@ export default function LoginScreen() {
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
           <Pressable style={styles.recuperarBoton}>
-            <Text style={styles.recuperarTexto}>Recuperar contraseña</Text>
+            <Text style={styles.recuperarTexto}>Recuperar contrasena</Text>
           </Pressable>
 
-          <Pressable style={styles.boton} onPress={manejarLogin}>
-            <Text style={styles.botonTexto}>Iniciar sesión</Text>
+          <Pressable
+            style={[styles.boton, cargando && styles.botonDeshabilitado]}
+            onPress={manejarLogin}
+            disabled={cargando}
+          >
+            {cargando ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.botonTexto}>Iniciar sesion</Text>
+            )}
           </Pressable>
 
           <View style={styles.footer}>
-            <Text style={styles.footerTexto}>¿No tienes cuenta? </Text>
+            <Text style={styles.footerTexto}>No tienes cuenta? </Text>
             <Link href="/register" style={styles.footerLink}>
-              Regístrate
+              Registrate
             </Link>
           </View>
         </View>
@@ -196,6 +248,9 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     width: 150,
     alignSelf: 'center',
+  },
+  botonDeshabilitado: {
+    opacity: 0.7,
   },
   botonTexto: {
     color: '#ffffff',
