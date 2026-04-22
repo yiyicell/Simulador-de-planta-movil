@@ -9,9 +9,17 @@ export type UsuarioSesion = {
   creado: string | null
 }
 
+export type PlantaSesion = {
+  id: number
+  nombre: string
+  tipo: string
+}
+
 type SessionContextType = {
   usuario: UsuarioSesion | null
+  plantaActual: PlantaSesion | null
   setUsuario: (usuario: UsuarioSesion | null) => void
+  setPlantaActual: (planta: PlantaSesion | null) => void
   cerrarSesionLocal: () => void
 }
 
@@ -19,14 +27,20 @@ const SessionContext = createContext<SessionContextType | undefined>(undefined)
 
 export function SessionProvider({ children }: React.PropsWithChildren) {
   const [usuario, setUsuario] = useState<UsuarioSesion | null>(null)
+  const [plantaActual, setPlantaActual] = useState<PlantaSesion | null>(null)
 
   const value = useMemo(
     () => ({
       usuario,
+      plantaActual,
       setUsuario,
-      cerrarSesionLocal: () => setUsuario(null),
+      setPlantaActual,
+      cerrarSesionLocal: () => {
+        setUsuario(null)
+        setPlantaActual(null)
+      },
     }),
-    [usuario]
+    [plantaActual, usuario]
   )
 
   return (

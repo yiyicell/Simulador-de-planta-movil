@@ -16,6 +16,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" />
           <Stack.Screen name="login" />
           <Stack.Screen name="register" />
+          <Stack.Screen name="select-plant" />
           <Stack.Screen name="(tabs)" />
         </Stack>
         <StatusBar style="auto" />
