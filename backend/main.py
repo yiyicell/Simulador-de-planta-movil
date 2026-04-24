@@ -133,6 +133,18 @@ class MacetaRequest(BaseModel):
     ventilation_level: float | None = None
 
 
+class EtapaRequest(BaseModel):
+    etapa: str
+
+    @field_validator("etapa")
+    @classmethod
+    def etapa_valida(cls, v: str) -> str:
+        from plant.growth import DESCRIPCION_ETAPAS
+        if v not in DESCRIPCION_ETAPAS:
+            raise ValueError(f"Etapa inválida. Válidas: {list(DESCRIPCION_ETAPAS.keys())}")
+        return v
+
+
 # ---------------------------------------------------------------------------
 # Eventos de ciclo de vida
 # ---------------------------------------------------------------------------
@@ -615,4 +627,69 @@ def get_historial(plant_id: int, limit: int = 50):
             }
             for h in resultado["historial"]
         ],
+    }
+
+
+# ---------------------------------------------------------------------------
+# Endpoint de demostración: cambio directo de etapa
+# ---------------------------------------------------------------------------
+
+# Acciones mínimas necesarias para cada etapa (para ambos tipos de planta)
+_ACCIONES_POR_ETAPA: dict[str, int] = {
+    "germinacion":         0,
+    "enraizamiento":       3,
+    "plantula":            8,
+    "crecimiento":         15,
+    "floracion":           25,
+    "fructificacion":      35,
+    "vara_floral":         25,
+    "botones_florales":    32,
+    "crecimiento_botones": 40,
+    "apertura_petalos":    50,
+}
+
+
+@app.put("/plants/{plant_id}/stage", summary="[Demo] Cambiar etapa de crecimiento directamente")
+def put_etapa(plant_id: int, datos: EtapaRequest):
+    """
+    **Solo para demostración.** Establece la etapa de crecimiento de la planta
+    de forma directa, ajustando también `total_care_actions` al mínimo necesario
+    para dicha etapa.
+
+    Etapas válidas (orquídea): germinacion, enraizamiento, plantula, crecimiento,
+    vara_floral, botones_florales, crecimiento_botones, apertura_petalos.
+
+    Etapas válidas (general): germinacion, enraizamiento, plantula, crecimiento,
+    floracion, fructificacion.
+    """
+    from plant.growth import DESCRIPCION_ETAPAS
+
+    acciones = _ACCIONES_POR_ETAPA.get(datos.etapa, 0)
+    conn = get_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id_plant FROM plant WHERE id_plant = %s",
+            (plant_id,),
+        )
+        if cursor.fetchone() is None:
+            return JSONResponse(status_code=404, content={"mensaje": "Planta no encontrada."})
+
+        cursor.execute(
+            """
+            UPDATE plant
+            SET growth_stage = %s, total_care_actions = %s
+            WHERE id_plant = %s
+            """,
+            (datos.etapa, acciones, plant_id),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+    return {
+        "mensaje": f"Etapa cambiada a '{datos.etapa}'.",
+        "etapa": datos.etapa,
+        "etapa_descripcion": DESCRIPCION_ETAPAS[datos.etapa],
+        "total_care_actions": acciones,
     }
