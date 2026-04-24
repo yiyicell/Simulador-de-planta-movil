@@ -21,13 +21,31 @@ Cada acción suma 1 a total_care_actions y se registra en care_history.
 try:
     from backend.database import get_connection
     from backend.plant.models import PlantaRespuesta
-    from backend.plant.growth import calcular_salud, obtener_etapa, LUZ_FACTOR_SECADO
+    from backend.plant.growth import (
+        calcular_salud,
+        obtener_etapa,
+        LUZ_FACTOR_SECADO,
+        REGLAS_AGUA,
+        REGLAS_LUZ,
+        REGLAS_HUMEDAD,
+        REGLAS_VENTILACION,
+    )
     from backend.plant.history import registrar_accion
+    from backend.economy import sumar_coins_por_cuidado, RECOMPENSA_CUIDADO_OPTIMO
 except ModuleNotFoundError:
     from database import get_connection
     from plant.models import PlantaRespuesta
-    from plant.growth import calcular_salud, obtener_etapa, LUZ_FACTOR_SECADO
+    from plant.growth import (
+        calcular_salud,
+        obtener_etapa,
+        LUZ_FACTOR_SECADO,
+        REGLAS_AGUA,
+        REGLAS_LUZ,
+        REGLAS_HUMEDAD,
+        REGLAS_VENTILACION,
+    )
     from plant.history import registrar_accion
+    from economy import sumar_coins_por_cuidado, RECOMPENSA_CUIDADO_OPTIMO
 
 # Constantes de riego
 ML_MIN = 10.0
@@ -94,6 +112,16 @@ def _fila_a_respuesta(row) -> PlantaRespuesta:
     )
 
 
+def _es_cuidado_optimo(water_level: float, light_level: float, humidity_level: float, ventilation: float, health: float) -> bool:
+    return (
+        REGLAS_AGUA["optimo_bajo"] <= water_level <= REGLAS_AGUA["optimo_alto"]
+        and REGLAS_LUZ["optimo_bajo"] <= light_level <= REGLAS_LUZ["optimo_alto"]
+        and REGLAS_HUMEDAD["optimo_bajo"] <= humidity_level <= REGLAS_HUMEDAD["optimo_alto"]
+        and REGLAS_VENTILACION["optimo_bajo"] <= ventilation <= REGLAS_VENTILACION["optimo_alto"]
+        and health >= 80.0
+    )
+
+
 def regar_planta(plant_id: int, cantidad_ml: float) -> dict:
     """
     Aplica un riego a la planta.
@@ -144,6 +172,12 @@ def regar_planta(plant_id: int, cantidad_ml: float) -> dict:
             extra_info=f"+{pts_agua:.1f} pts agua (sustrato: {sustrato_nombre}, retención: {water_retention:.2f}x)",
             conn=conn,
         )
+
+        coins_ganadas = 0
+        if _es_cuidado_optimo(water_level, light_level, humidity_level, ventilation, nueva_salud):
+            coins_ganadas = RECOMPENSA_CUIDADO_OPTIMO
+            sumar_coins_por_cuidado(user_id=row[10], plant_id=plant_id, coins=coins_ganadas, conn=conn)
+
         conn.commit()
 
         row_actualizado = _obtener_planta(plant_id, conn)
@@ -154,6 +188,7 @@ def regar_planta(plant_id: int, cantidad_ml: float) -> dict:
                 f"+{pts_agua:.1f} pts de agua (sustrato: {sustrato_nombre})."
             ),
             "planta": _fila_a_respuesta(row_actualizado),
+            "coins_ganadas": coins_ganadas,
         }
     except Exception as e:
         conn.rollback()
@@ -204,6 +239,12 @@ def ajustar_luz(plant_id: int, intensidad: float) -> dict:
             extra_info=f"Intensidad: {intensidad:.0f}%",
             conn=conn,
         )
+
+        coins_ganadas = 0
+        if _es_cuidado_optimo(water_level, light_level, humidity_level, ventilation, nueva_salud):
+            coins_ganadas = RECOMPENSA_CUIDADO_OPTIMO
+            sumar_coins_por_cuidado(user_id=row[10], plant_id=plant_id, coins=coins_ganadas, conn=conn)
+
         conn.commit()
 
         row_actualizado = _obtener_planta(plant_id, conn)
@@ -211,6 +252,7 @@ def ajustar_luz(plant_id: int, intensidad: float) -> dict:
             "exito": True,
             "mensaje": f"Intensidad de luz ajustada a {intensidad:.0f}%.",
             "planta": _fila_a_respuesta(row_actualizado),
+            "coins_ganadas": coins_ganadas,
         }
     except Exception as e:
         conn.rollback()
@@ -261,6 +303,12 @@ def ajustar_ventilacion(plant_id: int, nivel: float) -> dict:
             extra_info=f"Ventilación ajustada a {nivel:.0f}%",
             conn=conn,
         )
+
+        coins_ganadas = 0
+        if _es_cuidado_optimo(water_level, light_level, humidity_level, ventilation, nueva_salud):
+            coins_ganadas = RECOMPENSA_CUIDADO_OPTIMO
+            sumar_coins_por_cuidado(user_id=row[10], plant_id=plant_id, coins=coins_ganadas, conn=conn)
+
         conn.commit()
 
         row_actualizado = _obtener_planta(plant_id, conn)
@@ -268,6 +316,7 @@ def ajustar_ventilacion(plant_id: int, nivel: float) -> dict:
             "exito": True,
             "mensaje": f"Ventilación ambiental ajustada a {nivel:.0f}%.",
             "planta": _fila_a_respuesta(row_actualizado),
+            "coins_ganadas": coins_ganadas,
         }
     except Exception as e:
         conn.rollback()
