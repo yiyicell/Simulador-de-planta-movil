@@ -1,1 +1,1 @@
-export const API_BASE_URL = 'https://fancy-mangos-run.loca.lt'
+export const API_BASE_URL = 'https://deep-tigers-trade.loca.lt'

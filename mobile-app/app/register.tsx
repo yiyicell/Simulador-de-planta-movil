@@ -12,6 +12,8 @@ import {
 } from 'react-native'
 import { useFonts } from 'expo-font'
 
+import { API_BASE_URL } from '@/constants/api'
+
 export default function RegisterScreen() {
   const [nombre, setNombre] = useState('')
   const [correo, setCorreo] = useState('')
@@ -73,20 +75,17 @@ export default function RegisterScreen() {
     try {
       setMensajeError('')
 
-      const respuesta = await fetch(
-        'https://rare-pots-melt.loca.lt/auth/register',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            nombre: nombreLimpio,
-            correo: correoLimpio,
-            password: contrasena,
-          }),
-        }
-      )
+      const respuesta = await fetch(`${API_BASE_URL}/auth/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          nombre: nombreLimpio,
+          correo: correoLimpio,
+          password: contrasena,
+        }),
+      })
 
       const textoRespuesta = await respuesta.text()
 
