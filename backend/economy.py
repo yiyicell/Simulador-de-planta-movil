@@ -43,7 +43,7 @@ def obtener_saldo(user_id: int) -> dict:
     conn = get_connection()
     try:
         cursor = conn.cursor()
-        cursor.execute('SELECT coins FROM "user" WHERE user_id = %s', (user_id,))
+        cursor.execute('SELECT COALESCE(coins, 0) FROM "user" WHERE user_id = %s', (user_id,))
         row = cursor.fetchone()
         if row is None:
             return {"exito": False, "mensaje": "Usuario no encontrado."}

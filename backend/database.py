@@ -59,6 +59,11 @@ def init_db() -> None:
         END$$;
     """)
 
+    # Corregir filas existentes con coins NULL
+    cursor.execute("""
+        UPDATE "user" SET coins = 0 WHERE coins IS NULL;
+    """)
+
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS plant (
             id_plant            SERIAL PRIMARY KEY,
