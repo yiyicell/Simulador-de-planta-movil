@@ -40,10 +40,23 @@ def init_db() -> None:
             name           CHARACTER VARYING(50) NOT NULL,
             email          TEXT        NOT NULL UNIQUE,
             hashed_password TEXT       NOT NULL,
+            coins          BIGINT      NOT NULL DEFAULT 0,
             online         BOOLEAN     NOT NULL DEFAULT FALSE,
             rol_admin      BOOLEAN     NOT NULL DEFAULT FALSE,
             creation_date  DATE        NOT NULL DEFAULT CURRENT_DATE
         )
+    """)
+
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM information_schema.columns
+                WHERE table_name = 'user' AND column_name = 'coins'
+            ) THEN
+                ALTER TABLE "user" ADD COLUMN coins BIGINT NOT NULL DEFAULT 0;
+            END IF;
+        END$$;
     """)
 
     cursor.execute("""
@@ -152,6 +165,70 @@ def init_db() -> None:
             extra_info   TEXT,
             created_at   TIMESTAMP DEFAULT NOW()
         )
+    """)
+
+    # Historial de movimientos de coins
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS coin_transaction (
+            id_transaction   SERIAL PRIMARY KEY,
+            fk_user_id       INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+            amount           INTEGER NOT NULL,
+            movement_type    CHARACTER VARYING(20) NOT NULL,
+            reason           CHARACTER VARYING(120),
+            related_plant_id INTEGER REFERENCES plant(id_plant),
+            related_item_id  INTEGER,
+            created_at       TIMESTAMP NOT NULL DEFAULT NOW()
+        )
+    """)
+
+    # Catálogo de ítems de tienda
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS shop_item (
+            id_item       SERIAL PRIMARY KEY,
+            item_name     CHARACTER VARYING(80) NOT NULL UNIQUE,
+            item_type     CHARACTER VARYING(30) NOT NULL,
+            price_coins   INTEGER NOT NULL,
+            rarity        CHARACTER VARYING(20) DEFAULT 'common',
+            active        BOOLEAN NOT NULL DEFAULT TRUE
+        )
+    """)
+
+    cursor.execute("""
+        DO $$
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM pg_constraint
+                WHERE conname = 'shop_item_item_name_key'
+            ) THEN
+                ALTER TABLE shop_item
+                ADD CONSTRAINT shop_item_item_name_key UNIQUE (item_name);
+            END IF;
+        END$$;
+    """)
+
+    # Inventario del usuario
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS user_inventory (
+            id_inventory  SERIAL PRIMARY KEY,
+            fk_user_id    INTEGER NOT NULL REFERENCES "user"(user_id) ON DELETE CASCADE,
+            fk_item_id    INTEGER NOT NULL REFERENCES shop_item(id_item),
+            quantity      INTEGER NOT NULL DEFAULT 1,
+            acquired_at   TIMESTAMP NOT NULL DEFAULT NOW(),
+            UNIQUE (fk_user_id, fk_item_id)
+        )
+    """)
+
+    # Seed de ítems iniciales de tienda
+    cursor.execute("""
+        INSERT INTO shop_item (item_name, item_type, price_coins, rarity, active)
+        VALUES
+            ('Maceta de barro clásica', 'maceta', 25, 'common', TRUE),
+            ('Maceta minimalista blanca', 'maceta', 45, 'rare', TRUE),
+            ('Fondo Bosque de Niebla', 'fondo', 30, 'common', TRUE),
+            ('Fondo Atardecer Andino', 'fondo', 60, 'epic', TRUE),
+            ('Roca decorativa musgo', 'decoracion', 20, 'common', TRUE),
+            ('Luciérnagas mágicas', 'decoracion', 75, 'epic', TRUE)
+        ON CONFLICT DO NOTHING
     """)
 
     # Tokens de recuperación de contraseña

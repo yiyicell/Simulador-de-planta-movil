@@ -28,6 +28,7 @@ from plant.substrate import obtener_tipos_sustrato, asignar_sustrato
 from plant.pot import obtener_maceta, actualizar_maceta
 from plant.history import obtener_historial
 from plant.decay import calcular_decaimiento, INTERVALO_MINUTOS
+from economy import obtener_saldo, listar_items, comprar_item, obtener_inventario
 
 app = FastAPI(
     title="Simulador de Planta Móvil — API",
@@ -143,6 +144,12 @@ class EtapaRequest(BaseModel):
         if v not in DESCRIPCION_ETAPAS:
             raise ValueError(f"Etapa inválida. Válidas: {list(DESCRIPCION_ETAPAS.keys())}")
         return v
+
+
+class CompraItemRequest(BaseModel):
+    user_id: int
+    item_id: int
+    quantity: int = 1
 
 
 # ---------------------------------------------------------------------------
@@ -414,6 +421,7 @@ def post_regar(plant_id: int, datos: RegarRequest):
             "total_care_actions": p.total_care_actions,
             "substrate_name":     p.substrate_name,
         },
+        "coins_ganadas": resultado.get("coins_ganadas", 0),
     }
 
 
@@ -439,6 +447,7 @@ def post_luz(plant_id: int, datos: LuzRequest):
             "growth_stage":       p.growth_stage,
             "total_care_actions": p.total_care_actions,
         },
+        "coins_ganadas": resultado.get("coins_ganadas", 0),
     }
 
 
@@ -465,6 +474,7 @@ def post_ventilacion(plant_id: int, datos: VentilacionRequest):
             "growth_stage":       p.growth_stage,
             "total_care_actions": p.total_care_actions,
         },
+        "coins_ganadas": resultado.get("coins_ganadas", 0),
     }
 
 
@@ -692,4 +702,65 @@ def put_etapa(plant_id: int, datos: EtapaRequest):
         "etapa": datos.etapa,
         "etapa_descripcion": DESCRIPCION_ETAPAS[datos.etapa],
         "total_care_actions": acciones,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Endpoints de economía y tienda
+# ---------------------------------------------------------------------------
+
+@app.get("/economy/users/{user_id}/wallet", summary="Consultar saldo de Plantastic Coins")
+def get_wallet(user_id: int):
+    resultado = obtener_saldo(user_id)
+    if not resultado["exito"]:
+        return JSONResponse(status_code=500, content={"mensaje": resultado.get("mensaje", "Error interno.")})
+    return {
+        "user_id": resultado["user_id"],
+        "coins_balance": resultado["coins_balance"],
+    }
+
+
+@app.get("/shop/items", summary="Listar ítems de tienda")
+def get_shop_items(item_type: str | None = None):
+    """
+    Lista ítems activos de tienda.
+    Tipos soportados: maceta, fondo, decoracion.
+    """
+    if item_type is not None and item_type not in {"maceta", "fondo", "decoracion"}:
+        return JSONResponse(
+            status_code=400,
+            content={"mensaje": "item_type inválido. Usa: maceta, fondo o decoracion."},
+        )
+
+    resultado = listar_items(item_type=item_type)
+    if not resultado["exito"]:
+        return JSONResponse(status_code=500, content={"mensaje": resultado.get("mensaje", "Error interno.")})
+    return {
+        "total": len(resultado["items"]),
+        "items": resultado["items"],
+    }
+
+
+@app.post("/shop/purchase", summary="Comprar ítem de tienda")
+def post_shop_purchase(datos: CompraItemRequest):
+    resultado = comprar_item(
+        user_id=datos.user_id,
+        item_id=datos.item_id,
+        quantity=datos.quantity,
+    )
+    if not resultado["exito"]:
+        if "Saldo insuficiente" in resultado.get("mensaje", ""):
+            return JSONResponse(status_code=400, content=resultado)
+        return JSONResponse(status_code=404, content=resultado)
+    return resultado
+
+
+@app.get("/shop/users/{user_id}/inventory", summary="Consultar inventario del usuario")
+def get_user_inventory(user_id: int):
+    resultado = obtener_inventario(user_id)
+    if not resultado["exito"]:
+        return JSONResponse(status_code=500, content={"mensaje": resultado.get("mensaje", "Error interno.")})
+    return {
+        "total": len(resultado["inventario"]),
+        "inventario": resultado["inventario"],
     }
