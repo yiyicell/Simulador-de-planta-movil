@@ -160,7 +160,10 @@ export default function LoginScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable style={styles.recuperarBoton}>
+          <Pressable
+            style={styles.recuperarBoton}
+            onPress={() => router.push('/forgot-password')}
+          >
             <Text style={styles.recuperarTexto}>Recuperar contrasena</Text>
           </Pressable>
 

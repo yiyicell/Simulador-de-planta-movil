@@ -123,7 +123,7 @@ export default function RegisterScreen() {
           },
         ]
       )
-    } catch (error: any) {
+    } catch {
       setMensajeError('No se pudo conectar con el servidor')
     }
   }

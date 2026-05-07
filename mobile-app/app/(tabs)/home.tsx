@@ -23,6 +23,7 @@ type ClaveModal =
   | 'opciones'
   | 'salud'
   | 'maceta'
+  | 'tienda'
   | 'sustrato'
   | 'historial'
   | 'intensidad'
@@ -78,6 +79,31 @@ type HistorialItem = {
   created_at: string
 }
 
+type ItemTienda = {
+  id_item: number
+  item_name: string
+  item_type: string
+  price_coins: number
+  rarity: string
+  active: boolean
+}
+
+type ItemInventario = {
+  id_inventory: number
+  id_item: number
+  item_name: string
+  item_type: string
+  rarity: string
+  quantity: number
+  acquired_at: string
+}
+
+type PresetMaceta = {
+  material: 'plastico' | 'ceramica' | 'terracota' | 'vidrio'
+  drainage_level: number
+  ventilation_level: number
+}
+
 const imagenes = {
   perfil: require('../../assets/images/profile.png'),
   opciones: require('../../assets/images/options.png'),
@@ -98,19 +124,22 @@ const imagenes = {
 }
 
 const imagenesEtapas: Record<string, any> = {
-  germinacion: require('../../assets/images/germinacion.png'),
-  enraizamiento: require('../../assets/images/enraizamiento.png'),
-  plantula: require('../../assets/images/plantula.png'),
-  crecimiento: require('../../assets/images/crecimiento.png'),
-  vara_floral: require('../../assets/images/vara_floral.png'),
-  botones_florales: require('../../assets/images/botones_florales.png'),
-  crecimiento_botones: require('../../assets/images/crecimiento_botones.png'),
-  apertura_petalos: require('../../assets/images/apertura_petalos.png'),
+  germinacion: require('../../assets/images/seed-pot1.png'),
+  enraizamiento: require('../../assets/images/enraizamiento-pot1.png'),
+  plantula: require('../../assets/images/plantula-pot1.png'),
+  crecimiento: require('../../assets/images/crecimiento-pot1.png'),
+  vara_floral: require('../../assets/images/vara_floral-pot1.png'),
+  botones_florales: require('../../assets/images/botones_florales-pot1.png'),
+  crecimiento_botones: require('../../assets/images/crecimiento_botones-pot1.png'),
+  apertura_petalos: require('../../assets/images/apertura_petalos-pot1.png'),
 }
 
 const MAX_RIEGO_ML = 1000
 const PASO_RIEGO_ML = 50
 const PASO_LUZ = 5
+const TUNNEL_HEADERS = {
+  'bypass-tunnel-reminder': 'true',
+}
 
 function clamp(valor: number) {
   return Math.max(0, Math.min(100, valor))
@@ -128,31 +157,85 @@ function formatearEtapa(etapa?: string) {
 }
 
 function obtenerImagenEtapa(etapa?: string) {
-  return etapa ? imagenesEtapas[etapa] || imagenes.orquidea : imagenes.orquidea
+  return etapa
+    ? imagenesEtapas[etapa] || imagenesEtapas.germinacion
+    : imagenesEtapas.germinacion
 }
 
-function obtenerEscalaEtapa(etapa?: string) {
-  if (etapa === 'germinacion') {
-    return 0.82
+function obtenerLayoutEtapa(etapa?: string) {
+  switch (etapa) {
+    case 'plantula':
+      return {
+        width: 238,
+        height: 286,
+        marginBottom: -6,
+        translateX: 4,
+      }
+    case 'crecimiento':
+      return {
+        width: 238,
+        height: 286,
+        marginBottom: -6,
+        translateX: -24,
+      }
+    case 'vara_floral':
+      return {
+        width: 270,
+        height: 430,
+        marginBottom: -82,
+        translateX: 10,
+      }
+    case 'botones_florales':
+    case 'crecimiento_botones':
+    case 'apertura_petalos':
+      return {
+        width: 270,
+        height: 410,
+        marginBottom: -72,
+        translateX: -25,
+      }
+    default:
+      return {
+        width: 238,
+        height: 286,
+        marginBottom: -6,
+        translateX: 0,
+      }
   }
-
-  if (etapa === 'enraizamiento') {
-    return 0.88
-  }
-
-  if (etapa === 'apertura_petalos') {
-    return 1.08
-  }
-
-  return 1
 }
 
-function obtenerDesplazamientoEtapa(etapa?: string) {
-  if (etapa === 'plantula') {
-    return 28
+function obtenerPresetMaceta(itemName: string): PresetMaceta {
+  const nombre = itemName.toLowerCase()
+
+  if (nombre.includes('barro')) {
+    return {
+      material: 'terracota',
+      drainage_level: 72,
+      ventilation_level: 78,
+    }
   }
 
-  return 0
+  if (nombre.includes('blanca') || nombre.includes('minimalista')) {
+    return {
+      material: 'ceramica',
+      drainage_level: 64,
+      ventilation_level: 58,
+    }
+  }
+
+  if (nombre.includes('vidrio')) {
+    return {
+      material: 'vidrio',
+      drainage_level: 48,
+      ventilation_level: 42,
+    }
+  }
+
+  return {
+    material: 'plastico',
+    drainage_level: 60,
+    ventilation_level: 50,
+  }
 }
 
 function colorBarra(valor: number) {
@@ -225,10 +308,15 @@ export default function HomeScreen() {
   const [cargandoModal, setCargandoModal] = useState(false)
   const [ejecutandoAccion, setEjecutandoAccion] = useState(false)
   const [errorModal, setErrorModal] = useState('')
+  const [errorInventario, setErrorInventario] = useState('')
   const [estado, setEstado] = useState<EstadoRespuesta | null>(null)
   const [maceta, setMaceta] = useState<MacetaRespuesta['maceta'] | null>(null)
   const [sustratos, setSustratos] = useState<SustratoCatalogo[]>([])
   const [historial, setHistorial] = useState<HistorialItem[]>([])
+  const [itemsTienda, setItemsTienda] = useState<ItemTienda[]>([])
+  const [inventario, setInventario] = useState<ItemInventario[]>([])
+  const [coinsBalance, setCoinsBalance] = useState<number | null>(null)
+  const [itemComprandoId, setItemComprandoId] = useState<number | null>(null)
   const [cantidadRiego, setCantidadRiego] = useState('')
   const [intensidadLuz, setIntensidadLuz] = useState('')
   const [feedbackVisual, setFeedbackVisual] = useState('')
@@ -263,10 +351,21 @@ export default function HomeScreen() {
     }
 
     cargarEstado(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plantaActual?.id])
+
+  useEffect(() => {
+    if (!usuario?.id) {
+      return
+    }
+
+    void cargarSaldo()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [usuario?.id])
 
   const abrirModal = (clave: ClaveModal) => {
     setErrorModal('')
+    setErrorInventario('')
     setModalActivo(clave)
   }
 
@@ -277,6 +376,7 @@ export default function HomeScreen() {
 
     setModalActivo(null)
     setErrorModal('')
+    setErrorInventario('')
   }
 
   const animarCambio = (mensaje: string) => {
@@ -348,6 +448,14 @@ export default function HomeScreen() {
 
     if (modalActivo === 'maceta') {
       void cargarMaceta()
+      void cargarInventario()
+      void cargarSaldo()
+    }
+
+    if (modalActivo === 'tienda') {
+      void cargarTiendaMacetas()
+      void cargarInventario()
+      void cargarSaldo()
     }
 
     if (modalActivo === 'sustrato') {
@@ -358,6 +466,7 @@ export default function HomeScreen() {
     if (modalActivo === 'historial') {
       void cargarHistorial()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modalActivo, plantaActual?.id])
 
   const cargarMaceta = async () => {
@@ -465,6 +574,192 @@ export default function HomeScreen() {
     }
   }
 
+  const cargarSaldo = async () => {
+    if (!usuario?.id) {
+      return
+    }
+
+    try {
+      const respuesta = await fetch(
+        `${API_BASE_URL}/economy/users/${usuario.id}/wallet`,
+        {
+          headers: TUNNEL_HEADERS,
+        }
+      )
+      const texto = await respuesta.text()
+      let datos: any = {}
+
+      try {
+        datos = JSON.parse(texto)
+      } catch {
+        datos = {}
+      }
+
+      if (!respuesta.ok) {
+        setErrorModal(datos.mensaje || 'No se pudo consultar tus monedas')
+        return
+      }
+
+      setCoinsBalance(Number(datos.coins_balance) || 0)
+    } catch (error) {
+      console.log('Error consultando monedas:', error)
+      setErrorModal('No se pudo conectar con el servidor')
+    }
+  }
+
+  const cargarTiendaMacetas = async () => {
+    setCargandoModal(true)
+
+    try {
+      const respuesta = await fetch(`${API_BASE_URL}/shop/items?item_type=maceta`, {
+        headers: TUNNEL_HEADERS,
+      })
+      const texto = await respuesta.text()
+      let datos: any = {}
+
+      try {
+        datos = JSON.parse(texto)
+      } catch {
+        datos = {}
+      }
+
+      if (!respuesta.ok) {
+        setErrorModal(datos.mensaje || 'No se pudo consultar la tienda')
+        return
+      }
+
+      setItemsTienda(datos.items || [])
+    } catch (error) {
+      console.log('Error consultando tienda:', error)
+      setErrorModal('No se pudo conectar con el servidor')
+    } finally {
+      setCargandoModal(false)
+    }
+  }
+
+  const cargarInventario = async () => {
+    if (!usuario?.id) {
+      return
+    }
+
+    try {
+      setErrorInventario('')
+
+      const respuesta = await fetch(`${API_BASE_URL}/shop/users/${usuario.id}/inventory`, {
+        headers: TUNNEL_HEADERS,
+      })
+      const texto = await respuesta.text()
+      let datos: any = {}
+
+      try {
+        datos = JSON.parse(texto)
+      } catch {
+        datos = {}
+      }
+
+      if (!respuesta.ok) {
+        setErrorInventario(datos.mensaje || 'No se pudo consultar el inventario')
+        return
+      }
+
+      setInventario(datos.inventario || [])
+    } catch (error) {
+      console.log('Error consultando inventario:', error)
+      setErrorInventario('No se pudo conectar con el servidor')
+    }
+  }
+
+  const comprarMaceta = async (item: ItemTienda) => {
+    if (!usuario?.id || itemComprandoId) {
+      return
+    }
+
+    setItemComprandoId(item.id_item)
+    setErrorModal('')
+
+    try {
+      const respuesta = await fetch(`${API_BASE_URL}/shop/purchase`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...TUNNEL_HEADERS,
+        },
+        body: JSON.stringify({
+          user_id: usuario.id,
+          item_id: item.id_item,
+          quantity: 1,
+        }),
+      })
+      const texto = await respuesta.text()
+      let datos: any = {}
+
+      try {
+        datos = JSON.parse(texto)
+      } catch {
+        datos = {}
+      }
+
+      if (!respuesta.ok) {
+        setErrorModal(datos.mensaje || 'No se pudo comprar la maceta')
+        if (typeof datos.coins_balance === 'number') {
+          setCoinsBalance(datos.coins_balance)
+        }
+        return
+      }
+
+      setCoinsBalance(Number(datos.coins_balance) || 0)
+      await cargarInventario()
+      animarCambio(`${item.item_name} agregada al inventario`)
+    } catch (error) {
+      console.log('Error comprando maceta:', error)
+      setErrorModal('No se pudo conectar con el servidor')
+    } finally {
+      setItemComprandoId(null)
+    }
+  }
+
+  const equiparMaceta = async (nombreMaceta: string, preset: PresetMaceta) => {
+    if (!plantaActual?.id || ejecutandoAccion) {
+      return
+    }
+
+    setEjecutandoAccion(true)
+    setErrorModal('')
+
+    try {
+      const respuesta = await fetch(`${API_BASE_URL}/plants/${plantaActual.id}/pot`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...TUNNEL_HEADERS,
+        },
+        body: JSON.stringify(preset),
+      })
+      const texto = await respuesta.text()
+      let datos: any = {}
+
+      try {
+        datos = JSON.parse(texto)
+      } catch {
+        datos = {}
+      }
+
+      if (!respuesta.ok) {
+        setErrorModal(datos.mensaje || 'No se pudo cambiar la maceta')
+        return
+      }
+
+      setMaceta(datos.maceta)
+      await cargarHistorial()
+      animarCambio(`${nombreMaceta} equipada`)
+    } catch (error) {
+      console.log('Error cambiando maceta:', error)
+      setErrorModal('No se pudo conectar con el servidor')
+    } finally {
+      setEjecutandoAccion(false)
+    }
+  }
+
   const manejarRiego = async () => {
     if (!plantaActual?.id || ejecutandoAccion) {
       return
@@ -508,6 +803,7 @@ export default function HomeScreen() {
 
       await cargarEstado()
       await cargarHistorial()
+      await cargarSaldo()
       animarCambio(`Riego aplicado: ${Math.round(ml)} ml`)
       setModalActivo(null)
     } catch (error) {
@@ -561,6 +857,7 @@ export default function HomeScreen() {
 
       await cargarEstado()
       await cargarHistorial()
+      await cargarSaldo()
       animarCambio(`Luz ajustada a ${Math.round(intensidad)}%`)
       setModalActivo(null)
     } catch (error) {
@@ -654,8 +951,7 @@ export default function HomeScreen() {
   const creadoTexto = usuario?.creado || 'Sin fecha registrada'
   const planta = estado?.planta
   const imagenEtapaActual = obtenerImagenEtapa(planta?.growth_stage)
-  const escalaEtapaActual = obtenerEscalaEtapa(planta?.growth_stage)
-  const desplazamientoEtapaActual = obtenerDesplazamientoEtapa(planta?.growth_stage)
+  const layoutEtapa = obtenerLayoutEtapa(planta?.growth_stage)
   const intensidadActual = clamp(Number(intensidadLuz) || 0)
   const intensidadAplicada = clamp(planta?.light_level ?? 0)
   const opacidadLuzAmbiente = 0.02 + (intensidadAplicada / 100) * 0.08
@@ -750,7 +1046,7 @@ export default function HomeScreen() {
       },
       opciones: {
         titulo: 'Opciones',
-        texto: 'Desde aqui puedes cerrar sesion.',
+        texto: 'Desde aqui puedes cerrar sesion jeje.',
       },
       salud: {
         titulo: 'Salud de la planta',
@@ -761,10 +1057,14 @@ export default function HomeScreen() {
         titulo: 'Maceta',
         texto: 'Informacion fisica actual de la maceta asociada a la planta.',
       },
+      tienda: {
+        titulo: 'Tienda de macetas',
+        texto: 'Elige una maceta para comprarla con tus Plantastic Coins.',
+      },
       sustrato: {
         titulo: 'Sustrato',
         texto:
-          'Selecciona el sustrato que quieres asignar. El backend ajusta la retencion de agua.',
+          'Selecciona el sustrato que quieres asignar.',
       },
       historial: {
         titulo: 'Historial de registro',
@@ -785,10 +1085,10 @@ export default function HomeScreen() {
     return modalActivo ? contenido[modalActivo] : null
   }, [modalActivo])
 
-  const opcionesInferiores: Array<{
+  const opcionesInferiores: {
     clave: ClaveModal
     imagen: any
-  }> = [
+  }[] = [
     { clave: 'maceta', imagen: imagenes.maceta },
     { clave: 'sustrato', imagen: imagenes.sustrato },
     { clave: 'historial', imagen: imagenes.historial },
@@ -822,6 +1122,13 @@ export default function HomeScreen() {
     sustratos.find(
       (sustrato) => sustrato.id_substrate_type === sustratoSeleccionadoId
     ) || sustratos[0]
+  const inventarioMacetas = inventario.filter(
+    (item) => item.item_type === 'maceta'
+  )
+  const idsMacetasCompradas = new Set(
+    inventarioMacetas.map((item) => item.id_item)
+  )
+  const saldoVisible = coinsBalance ?? 0
 
   return (
     <SafeAreaView style={styles.container}>
@@ -879,26 +1186,29 @@ export default function HomeScreen() {
                 </Text>
 
                 <View style={styles.contenedorPlantaMaceta}>
-                  <Animated.Image
-                    source={imagenEtapaActual}
+                  <Animated.View
                     style={[
-                      styles.imagenPlanta,
+                      styles.imagenEtapaAnimada,
+                      {
+                        width: layoutEtapa.width,
+                        height: layoutEtapa.height,
+                        marginBottom: layoutEtapa.marginBottom,
+                      },
                       {
                         opacity: planta?.health && planta.health <= 20 ? 0.45 : 0.95,
                         transform: [
+                          { translateX: layoutEtapa.translateX },
                           { scale: animacionPlanta },
-                          { scale: escalaEtapaActual },
-                          { translateY: desplazamientoEtapaActual },
                         ],
                       },
                     ]}
-                    resizeMode="contain"
-                  />
-                  <Image
-                    source={imagenes.maceta}
-                    style={styles.imagenMacetaPrincipal}
-                    resizeMode="contain"
-                  />
+                  >
+                    <Image
+                      source={imagenEtapaActual}
+                      style={styles.imagenPlantaConMaceta}
+                      resizeMode="contain"
+                    />
+                  </Animated.View>
                 </View>
 
                 {feedbackVisual ? (
@@ -1002,6 +1312,21 @@ export default function HomeScreen() {
                     <Text style={styles.etiquetaDato}>Jardinero desde:</Text>
                     <Text style={styles.valorDato}>{creadoTexto}</Text>
                   </View>
+
+                  <View style={styles.tarjetaMonedasPerfil}>
+                    <View>
+                      <Text style={styles.etiquetaDato}>Plantastic Coins</Text>
+                      <Text style={styles.valorMonedasPerfil}>
+                        {saldoVisible} monedas
+                      </Text>
+                    </View>
+                    <Pressable
+                      style={styles.botonTiendaPerfil}
+                      onPress={() => abrirModal('tienda')}
+                    >
+                      <Text style={styles.textoBotonTienda}>Tienda</Text>
+                    </Pressable>
+                  </View>
                 </View>
               </View>
             ) : modalActivo === 'opciones' ? (
@@ -1089,7 +1414,10 @@ export default function HomeScreen() {
                         </Text>
                       </View>
 
-                      <Pressable style={styles.botonTienda}>
+                      <Pressable
+                        style={styles.botonTienda}
+                        onPress={() => abrirModal('tienda')}
+                      >
                         <Text style={styles.textoBotonTienda}>Tienda</Text>
                       </Pressable>
                     </View>
@@ -1100,10 +1428,26 @@ export default function HomeScreen() {
                         showsHorizontalScrollIndicator={false}
                         contentContainerStyle={styles.carruselInventario}
                       >
-                        <View style={[styles.slotMaceta, styles.slotMacetaActiva]}>
-                          <View style={styles.badgeMacetaActiva}>
-                            <Text style={styles.textoBadgeMacetaActiva}>Equipada</Text>
-                          </View>
+                        <Pressable
+                          style={[
+                            styles.slotMaceta,
+                            maceta.material === 'plastico' && styles.slotMacetaActiva,
+                            ejecutandoAccion && styles.tarjetaSeleccionDeshabilitada,
+                          ]}
+                          onPress={() =>
+                            equiparMaceta('Maceta base', {
+                              material: 'plastico',
+                              drainage_level: 60,
+                              ventilation_level: 50,
+                            })
+                          }
+                          disabled={ejecutandoAccion || maceta.material === 'plastico'}
+                        >
+                          {maceta.material === 'plastico' ? (
+                            <View style={styles.badgeMacetaActiva}>
+                              <Text style={styles.textoBadgeMacetaActiva}>Equipada</Text>
+                            </View>
+                          ) : null}
 
                           <Image
                             source={imagenes.maceta}
@@ -1115,22 +1459,75 @@ export default function HomeScreen() {
                           <Text style={styles.materialMacetaSlot}>
                             {maceta.material}
                           </Text>
-                        </View>
+                        </Pressable>
 
-                        {[1, 2, 3, 4, 5].map((slot) => (
-                          <View key={slot} style={styles.slotMacetaVacio}>
+                        {inventarioMacetas.map((item) => {
+                          const preset = obtenerPresetMaceta(item.item_name)
+                          const estaEquipada =
+                            maceta.material === preset.material &&
+                            Math.round(maceta.drainage_level) ===
+                              preset.drainage_level &&
+                            Math.round(maceta.ventilation_level) ===
+                              preset.ventilation_level
+
+                          return (
+                            <Pressable
+                              key={item.id_inventory}
+                              style={[
+                                styles.slotMaceta,
+                                estaEquipada && styles.slotMacetaActiva,
+                                ejecutandoAccion && styles.tarjetaSeleccionDeshabilitada,
+                              ]}
+                              onPress={() => equiparMaceta(item.item_name, preset)}
+                              disabled={ejecutandoAccion || estaEquipada}
+                            >
+                              {estaEquipada ? (
+                                <View style={styles.badgeMacetaActiva}>
+                                  <Text style={styles.textoBadgeMacetaActiva}>
+                                    Equipada
+                                  </Text>
+                                </View>
+                              ) : null}
+
+                              <Image
+                                source={imagenes.maceta}
+                                style={styles.imagenMacetaInventario}
+                                resizeMode="contain"
+                              />
+                              <Text style={styles.nombreMacetaSlot}>
+                                {item.item_name}
+                              </Text>
+                              <Text style={styles.materialMacetaSlot}>
+                                x{item.quantity}
+                              </Text>
+                            </Pressable>
+                          )
+                        })}
+
+                        {inventarioMacetas.length === 0 ? (
+                          <View style={styles.slotMacetaVacio}>
                             <Text style={styles.iconoMacetaVacia}>+</Text>
-                            <Text style={styles.textoSlotVacio}>Proximamente</Text>
+                            <Text style={styles.textoSlotVacio}>
+                              {errorInventario
+                                ? 'Inventario no disponible'
+                                : 'Compra nuevas macetas en la tienda'}
+                            </Text>
                           </View>
-                        ))}
+                        ) : null}
                       </ScrollView>
+
+                      {errorInventario ? (
+                        <Text style={styles.avisoInventario}>
+                          {errorInventario}
+                        </Text>
+                      ) : null}
 
                       <View style={styles.detalleMaceta}>
                         <Text style={styles.nombreMacetaInventario}>
                           Maceta base de {maceta.material}
                         </Text>
                         <Text style={styles.descripcionMacetaInventario}>
-                          Esta es tu primera maceta disponible. Cuando abras la tienda, las nuevas macetas apareceran aqui como parte del inventario.
+                          Esta es tu primera maceta disponible. Las macetas que compres en la tienda apareceran en este inventario.
                         </Text>
 
                         <View style={styles.gridStatsMaceta}>
@@ -1156,6 +1553,100 @@ export default function HomeScreen() {
                           </View>
                         </View>
                       </View>
+                    </View>
+                  </View>
+                ) : null}
+
+                {modalActivo === 'tienda' ? (
+                  <View style={styles.tiendaMacetas}>
+                    <View style={styles.encabezadoTienda}>
+                      <View>
+                        <Text style={styles.tituloInventario}>Estanteria</Text>
+                        <Text style={styles.subtituloInventario}>
+                          Macetas disponibles
+                        </Text>
+                      </View>
+
+                      <View style={styles.monedaTienda}>
+                        <Text style={styles.iconoMoneda}>PC</Text>
+                        <Text style={styles.valorMoneda}>{saldoVisible}</Text>
+                      </View>
+                    </View>
+
+                    <View style={styles.estanteria}>
+                      {itemsTienda.map((item) => {
+                        const estaComprada = idsMacetasCompradas.has(item.id_item)
+                        const saldoInsuficiente = saldoVisible < item.price_coins
+                        const comprando = itemComprandoId === item.id_item
+
+                        return (
+                          <View key={item.id_item} style={styles.celdaEstanteria}>
+                            {estaComprada ? (
+                              <View style={styles.badgeMacetaActiva}>
+                                <Text style={styles.textoBadgeMacetaActiva}>
+                                  Tuya
+                                </Text>
+                              </View>
+                            ) : null}
+
+                            <Image
+                              source={imagenes.maceta}
+                              style={styles.imagenMacetaTienda}
+                              resizeMode="contain"
+                            />
+
+                            <View style={styles.repisa} />
+
+                            <Text style={styles.nombreItemTienda}>
+                              {item.item_name}
+                            </Text>
+                            <Text style={styles.rarezaItemTienda}>
+                              {item.rarity}
+                            </Text>
+
+                            <View style={styles.precioItemTienda}>
+                              <Text style={styles.iconoMonedaMini}>PC</Text>
+                              <Text style={styles.textoPrecioTienda}>
+                                {item.price_coins}
+                              </Text>
+                            </View>
+
+                            <Pressable
+                              style={[
+                                styles.botonComprar,
+                                (estaComprada ||
+                                  saldoInsuficiente ||
+                                  itemComprandoId !== null) &&
+                                  styles.botonComprarDeshabilitado,
+                              ]}
+                              onPress={() => comprarMaceta(item)}
+                              disabled={
+                                estaComprada ||
+                                saldoInsuficiente ||
+                                itemComprandoId !== null
+                              }
+                            >
+                              {comprando ? (
+                                <ActivityIndicator color="#ffffff" size="small" />
+                              ) : (
+                                <Text style={styles.textoComprar}>
+                                  {estaComprada
+                                    ? 'Comprada'
+                                    : saldoInsuficiente
+                                      ? 'Faltan coins'
+                                      : 'Comprar'}
+                                </Text>
+                              )}
+                            </Pressable>
+                          </View>
+                        )
+                      })}
+
+                      {!cargandoModal && itemsTienda.length === 0 ? (
+                        <Text style={styles.valorDato}>
+                          Todavia no hay macetas en la tienda.
+                        </Text>
+                      ) : null}
                     </View>
                   </View>
                 ) : null}
@@ -1327,7 +1818,7 @@ export default function HomeScreen() {
                           {intensidadActual}%
                         </Text>
                       <Text style={styles.textoControlSecundario}>
-                          Desliza como la linterna del iPhone
+                          Desliza el control o usa los botones para ajustar la intensidad de luz que quieres aplicar a tu planta.
                       </Text>
                       </View>
 
@@ -1554,6 +2045,23 @@ const styles = StyleSheet.create({
     height: 42,
     resizeMode: 'contain',
   },
+  iconoMoneda: {
+    color: '#2a2106',
+    backgroundColor: '#f1c84b',
+    borderRadius: 999,
+    overflow: 'hidden',
+    fontSize: 9,
+    fontWeight: '900',
+    lineHeight: 18,
+    width: 18,
+    height: 18,
+    textAlign: 'center',
+  },
+  valorMoneda: {
+    color: '#f6e7a3',
+    fontSize: 13,
+    fontWeight: '800',
+  },
   indicadores: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1627,25 +2135,19 @@ const styles = StyleSheet.create({
     maxWidth: 220,
   },
   contenedorPlantaMaceta: {
-    width: 240,
-    height: 306,
+    width: 280,
+    height: 330,
     alignItems: 'center',
     justifyContent: 'flex-end',
     position: 'relative',
   },
-  imagenPlanta: {
-    position: 'absolute',
-    left: 24,
-    bottom: 72,
-    width: 192,
-    height: 214,
-    zIndex: 2,
+  imagenEtapaAnimada: {
+    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  imagenMacetaPrincipal: {
-    width: 128,
-    height: 138,
-    marginBottom: 0,
-    zIndex: 1,
+  imagenPlantaConMaceta: {
+    width: '100%',
+    height: '100%',
   },
   feedbackVisual: {
     marginTop: 12,
@@ -1824,6 +2326,29 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 21,
   },
+  tarjetaMonedasPerfil: {
+    borderRadius: 14,
+    backgroundColor: '#241f12',
+    borderWidth: 1,
+    borderColor: '#4a3c17',
+    padding: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  valorMonedasPerfil: {
+    color: '#f6e7a3',
+    fontSize: 20,
+    fontWeight: '800',
+    marginTop: 4,
+  },
+  botonTiendaPerfil: {
+    backgroundColor: '#8cbf71',
+    paddingHorizontal: 13,
+    paddingVertical: 9,
+    borderRadius: 999,
+  },
   alertaTexto: {
     color: '#ff9a9a',
     fontSize: 14,
@@ -1904,6 +2429,122 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  tiendaMacetas: {
+    gap: 14,
+  },
+  encabezadoTienda: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  monedaTienda: {
+    borderRadius: 999,
+    backgroundColor: '#241f12',
+    borderWidth: 1,
+    borderColor: '#4a3c17',
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+  },
+  estanteria: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    justifyContent: 'space-between',
+  },
+  celdaEstanteria: {
+    width: '48%',
+    minHeight: 218,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#3a2d1d',
+    backgroundColor: '#1b1510',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingTop: 12,
+    paddingBottom: 10,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  repisa: {
+    width: '112%',
+    height: 10,
+    backgroundColor: '#5a3a22',
+    borderTopWidth: 1,
+    borderTopColor: '#7a5534',
+    borderBottomWidth: 2,
+    borderBottomColor: '#2f1d12',
+    marginTop: -8,
+    marginBottom: 12,
+  },
+  imagenMacetaTienda: {
+    width: 76,
+    height: 76,
+    marginTop: 8,
+    marginBottom: 0,
+    zIndex: 1,
+  },
+  nombreItemTienda: {
+    color: '#f3f3f3',
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
+    lineHeight: 17,
+    minHeight: 36,
+  },
+  rarezaItemTienda: {
+    color: '#8cbf71',
+    fontSize: 10,
+    textTransform: 'uppercase',
+    fontWeight: '700',
+    marginTop: 2,
+  },
+  precioItemTienda: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  iconoMonedaMini: {
+    color: '#2a2106',
+    backgroundColor: '#f1c84b',
+    borderRadius: 999,
+    overflow: 'hidden',
+    fontSize: 8,
+    fontWeight: '900',
+    lineHeight: 16,
+    width: 16,
+    height: 16,
+    textAlign: 'center',
+  },
+  textoPrecioTienda: {
+    color: '#f6e7a3',
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  botonComprar: {
+    marginTop: 'auto',
+    backgroundColor: '#46a11f',
+    borderRadius: 9,
+    minHeight: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    alignSelf: 'stretch',
+  },
+  botonComprarDeshabilitado: {
+    opacity: 0.62,
+  },
+  textoComprar: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
   panelInventario: {
     gap: 14,
   },
@@ -1970,6 +2611,12 @@ const styles = StyleSheet.create({
   textoSlotVacio: {
     color: '#777777',
     fontSize: 11,
+    textAlign: 'center',
+  },
+  avisoInventario: {
+    color: '#d8a45f',
+    fontSize: 12,
+    lineHeight: 17,
     textAlign: 'center',
   },
   imagenMacetaInventario: {
