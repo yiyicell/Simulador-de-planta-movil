@@ -31,3 +31,18 @@ class UsuarioRespuesta:
     online: bool
     rol_admin: bool
     creado: str
+
+
+@dataclass
+class SolicitudRecuperacion:
+    """Correo al que se enviará el token de recuperación."""
+    correo: str
+
+
+@dataclass
+class RestablecerPassword:
+    """Datos que el usuario envía para cambiar su contraseña."""
+    correo: str
+    token: str
+    nueva_password: str
+    confirmar_password: str
