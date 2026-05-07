@@ -104,6 +104,14 @@ type PresetMaceta = {
   ventilation_level: number
 }
 
+type LayoutEtapa = {
+  width: number
+  height: number
+  marginBottom: number
+  translateX: number
+  centrarImagen?: boolean
+}
+
 const imagenes = {
   perfil: require('../../assets/images/profile.png'),
   opciones: require('../../assets/images/options.png'),
@@ -162,14 +170,24 @@ function obtenerImagenEtapa(etapa?: string) {
     : imagenesEtapas.germinacion
 }
 
-function obtenerLayoutEtapa(etapa?: string) {
+function obtenerLayoutEtapa(etapa?: string): LayoutEtapa {
   switch (etapa) {
+    case 'germinacion':
+    case 'enraizamiento':
+      return {
+        width: 238,
+        height: 286,
+        marginBottom: -6,
+        translateX: 0,
+        centrarImagen: true,
+      }
     case 'plantula':
       return {
         width: 238,
         height: 286,
         marginBottom: -6,
-        translateX: 4,
+        translateX: 0,
+        centrarImagen: true,
       }
     case 'crecimiento':
       return {
@@ -200,6 +218,7 @@ function obtenerLayoutEtapa(etapa?: string) {
         height: 286,
         marginBottom: -6,
         translateX: 0,
+        centrarImagen: true,
       }
   }
 }
@@ -1186,9 +1205,10 @@ export default function HomeScreen() {
                 </Text>
 
                 <View style={styles.contenedorPlantaMaceta}>
-                  <Animated.View
+                  <Animated.Image
+                    source={imagenEtapaActual}
                     style={[
-                      styles.imagenEtapaAnimada,
+                      styles.imagenPlantaConMaceta,
                       {
                         width: layoutEtapa.width,
                         height: layoutEtapa.height,
@@ -1196,19 +1216,16 @@ export default function HomeScreen() {
                       },
                       {
                         opacity: planta?.health && planta.health <= 20 ? 0.45 : 0.95,
-                        transform: [
-                          { translateX: layoutEtapa.translateX },
-                          { scale: animacionPlanta },
-                        ],
+                        transform: layoutEtapa.centrarImagen
+                          ? [{ scale: animacionPlanta }]
+                          : [
+                              { scale: animacionPlanta },
+                              { translateX: layoutEtapa.translateX },
+                            ],
                       },
                     ]}
-                  >
-                    <Image
-                      source={imagenEtapaActual}
-                      style={styles.imagenPlantaConMaceta}
-                      resizeMode="contain"
-                    />
-                  </Animated.View>
+                    resizeMode="contain"
+                  />
                 </View>
 
                 {feedbackVisual ? (
@@ -2141,13 +2158,9 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     position: 'relative',
   },
-  imagenEtapaAnimada: {
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
   imagenPlantaConMaceta: {
-    width: '100%',
-    height: '100%',
+    width: 238,
+    height: 286,
   },
   feedbackVisual: {
     marginTop: 12,
